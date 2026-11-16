@@ -1,0 +1,1 @@
+import{da as i,rb as o}from"./chunk-RYBQMOGQ.js";var ae=(()=>{class e{static forRoot(t){return{ngModule:e,providers:[{provide:"configuration",useValue:t}]}}static{this.\u0275fac=function(n){return new(n||e)}}static{this.\u0275mod=o({type:e})}static{this.\u0275inj=i({})}}return e})();export{ae as a};

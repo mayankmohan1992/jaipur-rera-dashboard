@@ -1,0 +1,11 @@
+# generated data — never committed (the Action rebuilds and deploys it as a Pages artifact)
+raw/
+site/data/
+
+# python
+__pycache__/
+*.pyc
+.venv/
+
+# os
+.DS_Store

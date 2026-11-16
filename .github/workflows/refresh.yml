@@ -1,0 +1,94 @@
+name: refresh
+
+on:
+  schedule:
+    # 06:00 IST (UTC+05:30) — the portal publishes approvals through the working day,
+    # so an early-morning run captures the previous day whole.
+    - cron: '30 0 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'pipeline/**'
+      - 'site/index.html'
+      - 'site/app.js'
+      - 'site/style.css'
+      - '.github/workflows/refresh.yml'
+
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      WORKERS: '12'
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Crawl Jaipur projects (master list + per-project Form-A/B)
+        run: python3 pipeline/crawl.py
+
+      - name: Crawl auxiliary registers (complaints, agents)
+        run: python3 pipeline/fetch_aux.py
+
+      - name: Build payloads
+        run: python3 pipeline/build.py
+
+      - name: Verify the dataset before publishing
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          meta = json.load(open('site/data/meta.json'))
+          proj = json.load(open('site/data/projects.json'))
+          t = meta['totals']
+          print(f"projects={t['projects']} promoters={t['promoters']} units={t['units']} "
+                f"plots={t['plots']} saleable={t['saleable']} cases={t['cases']}")
+          assert len(proj) == t['projects'], 'projects.json length != meta.totals.projects'
+          if t['projects'] < 2000:
+              sys.exit(f"refusing to publish: only {t['projects']} projects (expected ~2416)")
+          if t['promoters'] < 500:
+              sys.exit(f"refusing to publish: only {t['promoters']} promoters")
+          if not any(p['regDate'] for p in proj):
+              sys.exit('refusing to publish: no registration dates parsed')
+          print('dataset checks passed')
+          PY
+
+      - name: Record crawl ledger
+        run: |
+          {
+            echo "### Jaipur RERA refresh"
+            echo ""
+            echo "- as of: $(python3 -c "import json;print(json.load(open('site/data/meta.json'))['asOf'])")"
+            echo "- projects: $(python3 -c "import json;print(json.load(open('site/data/meta.json'))['totals']['projects'])")"
+            echo "- payload: $(du -sh site/data | cut -f1)"
+            wc -l < /dev/null > /dev/null
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
