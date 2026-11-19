@@ -11,7 +11,7 @@ PDFs it hosts.
 | Projects | 2,416 (Jaipur district, all categories, all statuses) |
 | Source | `rera.rajasthan.gov.in` (RERA Rajasthan 2.0 — Angular SPA over a .NET Web API) |
 | Data volunteers | project master, Form-A/Form-B payload, unit & plot inventory, cost estimate, document register, QPR/APR, encumbrances, complaint register, agent register |
-| Refreshed | daily 06:00 IST by GitHub Actions |
+| Refreshed | daily 06:30 IST by `scripts/refresh.sh` (systemd user timer) — cloud CI cannot reach the portal, see [Automation](#automation) |
 | Stack | Python 3 stdlib for ingest · vanilla HTML/CSS/JS for the UI · no build step, no CDN, no database server |
 
 ---
@@ -82,7 +82,8 @@ docs/
   DATA-DICTIONARY.md  every field, its meaning and its provenance
   METHOD.md        how units and plots are counted, and why that is the hard part
 .github/workflows/
-  refresh.yml      daily crawl -> build -> Pages artifact deploy
+  refresh.yml      reachability probe -> crawl -> build -> publish to gh-pages
+  refresh.sh       the only path that can crawl: local/timer run, then publish
 ```
 
 Generated data is deliberately **not** committed: the workflow builds it and deploys it as a
@@ -143,16 +144,50 @@ GROUP BY promoter ORDER BY sqm DESC LIMIT 20;
 
 ## Automation
 
-`.github/workflows/refresh.yml` runs daily:
+The portal **cannot be crawled from GitHub-hosted runners.** They run in Azure, and
+`reraapi.rajasthan.gov.in` drops their traffic at the packet level: DNS resolves to
+`103.203.139.246`, the TCP handshake never completes, and every retry ends in
+`[Errno 110] Connection timed out`. Measured 19 Nov 2026 from an `eastus` runner —
+`tcp/443` and `tcp/80` both blackholed, while consumer-ISP probes from the US, Germany,
+Poland and Russia connected in ~3 s. Five scheduled runs, five identical failures on
+the first request. That is a network policy, not a code fault, so no amount of retrying
+or timeout tuning fixes it.
 
-1. `crawl.py` — full re-crawl (every project's detail is re-fetched, so revisions, status changes
-   and new registrations all land).
-2. `fetch_aux.py` — complaint + agent registers.
-3. `build.py` — normalises and prints payload sizes; asserts the row count against the master list.
-4. Deploys `site/` as a Pages artifact.
+The pipeline therefore runs where Indian egress exists, and publishing is a plain branch push.
 
-The workflow fails loudly if the crawl loses more than 3% of projects, so a silent partial
-dataset never gets published.
+**Local / scheduled refresh** — `scripts/refresh.sh`:
+
+1. `preflight.py` — proves this machine can actually reach the portal before spending 35 minutes.
+2. `crawl.py` — full re-crawl (every project's detail is re-fetched, so revisions, status
+   changes and new registrations all land).
+3. `fetch_aux.py` — complaint + agent registers.
+4. `build.py` — normalises into `site/data/`.
+5. `verify.py` — refuses to publish a short dataset (row-count vs master, promoter floor,
+   registration dates present, detail-file coverage).
+6. Force-pushes `site/` to the `gh-pages` branch, which is what Pages serves.
+
+Daily at 06:30 IST via a systemd user timer:
+
+```bash
+systemctl --user list-timers jaipur-rera-refresh.timer
+systemctl --user status jaipur-rera-refresh.service
+journalctl --user -u jaipur-rera-refresh.service -n 50
+```
+
+`Persistent=true` means a missed run fires on the next boot, so a laptop that was asleep
+at 06:30 still refreshes. Manual run:
+
+```bash
+./scripts/refresh.sh              # full crawl + publish
+./scripts/refresh.sh --no-crawl   # rebuild from the raw/ cache and publish
+./scripts/refresh.sh --no-push    # build only, preview with `cd site && python3 -m http.server`
+```
+
+**GitHub Actions** (`.github/workflows/refresh.yml`) still runs on schedule and on push, but
+first calls `preflight.py`. When the runner cannot reach the portal it skips the crawl and
+exits **green** with a summary explaining why — a red X for someone else's firewall teaches
+nothing and hides real failures. If a self-hosted runner with Indian egress is ever added,
+change `runs-on: [self-hosted, linux]` and the same workflow does the full job.
 
 ---
 

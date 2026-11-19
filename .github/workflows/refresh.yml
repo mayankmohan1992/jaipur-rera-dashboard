@@ -1,15 +1,37 @@
 name: refresh
 
+# Why this workflow looks different from the first version
+# ---------------------------------------------------------
+# The crawl cannot run on GitHub-hosted runners. They are Azure, and
+# reraapi.rajasthan.gov.in drops their packets: DNS resolves, the TCP handshake
+# never completes. Measured 19 Nov 2026 from an eastus runner — tcp/443 and tcp/80
+# both blackholed, while consumer-ISP probes from the US/EU connected in ~3 s. Five
+# runs, five failures, same Errno 110 on the very first request.
+#
+# So the job now:
+#   1. probes reachability first (cheap, ~25 s worst case),
+#   2. crawls + builds only when it can actually reach the portal,
+#   3. publishes site/ to the gh-pages branch (Pages serves that branch),
+#   4. otherwise exits GREEN with a summary saying why it skipped — a network
+#      policy we do not control is not a build failure.
+#
+# To get real scheduled refreshes, either:
+#   a) install a self-hosted runner on a machine with Indian egress and change
+#      `runs-on` below to:  runs-on: [self-hosted, linux]
+#   b) run scripts/refresh.sh from cron / a systemd timer on that machine — it
+#      publishes through the same gh-pages path as step 3.
+
 on:
   schedule:
-    # 06:00 IST (UTC+05:30) — the portal publishes approvals through the working day,
-    # so an early-morning run captures the previous day whole.
+    # 06:00 IST — the portal publishes approvals through the working day, so an
+    # early-morning run captures the previous day whole.
     - cron: '30 0 * * *'
   workflow_dispatch:
   push:
     branches: [main]
     paths:
       - 'pipeline/**'
+      - 'scripts/**'
       - 'site/index.html'
       - 'site/app.js'
       - 'site/style.css'
@@ -20,17 +42,16 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 jobs:
-  build:
+  refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 150
+    timeout-minutes: 180
     env:
       WORKERS: '12'
       PYTHONUNBUFFERED: '1'
+
     steps:
       - uses: actions/checkout@v4
 
@@ -38,35 +59,58 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Probe portal reachability from this runner
+        id: probe
+        run: python3 pipeline/preflight.py --github
+
+      - name: Explain a skip
+        if: steps.probe.outputs.reachable != 'true'
+        run: |
+          {
+            echo "### refresh skipped — portal unreachable from this runner"
+            echo ""
+            echo "DNS resolves, but TCP to \`reraapi.rajasthan.gov.in:443\` never completes from"
+            echo "GitHub-hosted (Azure) egress: the portal drops cloud ASNs at the packet level."
+            echo "That is a network policy, not a code fault, so this run is green."
+            echo ""
+            echo "Refresh from a machine with Indian egress: \`scripts/refresh.sh\`, or point"
+            echo "\`runs-on\` at a self-hosted runner (see the comments at the top of this file)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Crawl Jaipur projects (master list + per-project Form-A/B)
+        if: steps.probe.outputs.reachable == 'true'
         run: python3 pipeline/crawl.py
 
       - name: Crawl auxiliary registers (complaints, agents)
+        if: steps.probe.outputs.reachable == 'true'
         run: python3 pipeline/fetch_aux.py
 
       - name: Build payloads
+        if: steps.probe.outputs.reachable == 'true'
         run: python3 pipeline/build.py
 
       - name: Verify the dataset before publishing
+        if: steps.probe.outputs.reachable == 'true'
+        run: python3 pipeline/verify.py
+
+      - name: Publish site/ to gh-pages
+        if: steps.probe.outputs.reachable == 'true'
         run: |
-          python3 - <<'PY'
-          import json, sys
-          meta = json.load(open('site/data/meta.json'))
-          proj = json.load(open('site/data/projects.json'))
-          t = meta['totals']
-          print(f"projects={t['projects']} promoters={t['promoters']} units={t['units']} "
-                f"plots={t['plots']} saleable={t['saleable']} cases={t['cases']}")
-          assert len(proj) == t['projects'], 'projects.json length != meta.totals.projects'
-          if t['projects'] < 2000:
-              sys.exit(f"refusing to publish: only {t['projects']} projects (expected ~2416)")
-          if t['promoters'] < 500:
-              sys.exit(f"refusing to publish: only {t['promoters']} promoters")
-          if not any(p['regDate'] for p in proj):
-              sys.exit('refusing to publish: no registration dates parsed')
-          print('dataset checks passed')
-          PY
+          set -euo pipefail
+          pub=$(mktemp -d)
+          cp -r site/. "$pub"/
+          touch "$pub/.nojekyll"
+          cd "$pub"
+          git init -q
+          git checkout -q -b gh-pages
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "publish $(date -u +%FT%TZ) from ${GITHUB_SHA::7}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
 
       - name: Record crawl ledger
+        if: steps.probe.outputs.reachable == 'true'
         run: |
           {
             echo "### Jaipur RERA refresh"
@@ -74,21 +118,4 @@ jobs:
             echo "- as of: $(python3 -c "import json;print(json.load(open('site/data/meta.json'))['asOf'])")"
             echo "- projects: $(python3 -c "import json;print(json.load(open('site/data/meta.json'))['totals']['projects'])")"
             echo "- payload: $(du -sh site/data | cut -f1)"
-            wc -l < /dev/null > /dev/null
           } >> "$GITHUB_STEP_SUMMARY"
-
-      - uses: actions/configure-pages@v5
-
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
