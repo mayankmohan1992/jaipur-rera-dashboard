@@ -131,6 +131,26 @@ Consequences, reflected in the UI:
 - The code keeps a project-name matching pass for the day the portal starts populating the
   column, but today it matches nothing.
 
+## 8a. Place names (tehsil / village)
+
+The portal has no controlled vocabulary for either field: promoters type them. The same
+tehsil arrives as `JAIPUR`, `Jaipur`, ` Jaipur ` and `jAIPUR`, and real misspellings show up
+too (`Mozmabad`, `MOJMABAAD` for Mauzamabad; `Rampura Dabdi` for Rampuradabri).
+
+Two passes in `pipeline/build.py` fix this before anything is aggregated:
+
+1. **Automatic fold** — `place_key()` lower-cases and strips everything but `[a-z0-9]`, so
+   case, spacing and punctuation variants collapse. The published spelling is the most
+   common variant that is not all-caps (`Kalwar` over `KALWAR`/`kalwar`); single-token
+   all-caps values are title-cased (`JOBNER` -> `Jobner`).
+2. **Curated aliases** — `pipeline/place-aliases.json` for differences the fold cannot see,
+   i.e. actual spelling differences. Add an entry only when it is the *same* place.
+
+Result on the 19 Nov 2026 crawl: tehsils 40 spellings -> 25 places (Jaipur 858 projects
+instead of 857 + 1), villages 1,080 -> 836. `Kalwad` and `Kalwar` are deliberately kept
+apart: two different villages in Jaipur district. The counts are written to
+`site/data/meta.json` under `places` so a regression is visible without re-reading this file.
+
 ## 9. Aggregation
 
 All aggregation happens in the browser over `projects.json`, so any filter combination
