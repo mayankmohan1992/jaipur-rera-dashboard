@@ -45,6 +45,89 @@ def norm(s):
     return re.sub(r"\s+", " ", s).strip()
 
 
+# --------------------------------------------------------------------------- #
+# places: the portal spells the same tehsil/village several ways
+# --------------------------------------------------------------------------- #
+PLACE_JUNK = re.compile(r"^[\s.\-–—/]*$")          # '', '.', '-', '—' mean "not filed"
+
+
+def place_key(v):
+    """Identity of a place, insensitive to case, spaces and punctuation.
+
+    'JAIPUR' / 'Jaipur' / ' Jaipur ' / 'jAIPUR'  -> jaipur
+    'KALWAR' / 'Kalwar' / 'kalwar'              -> kalwar
+    'RAMPURA DABRI' / 'Rampuradabri'            -> rampuradabri
+    'KALWAD' and 'KALWAR' stay apart: different villages.
+    """
+    s = str(v or "").strip()
+    if PLACE_JUNK.match(s):
+        return ""
+    return re.sub(r"[^a-z0-9]", "", s.lower())
+
+
+def _display_variant(variants):
+    """Most common spelling, preferring one that is not SHOUTING.
+
+    Better to show 'Kalwar' (10 rows) than 'KALWAR' (6) or 'kalwar' (9); when the
+    only spelling is upper case that is what gets shown, so nothing is invented.
+    """
+    def score(v):
+        mixed = not (v.isupper() or v.islower())
+        return (mixed, variants[v], v)
+    return max(variants, key=score)
+
+
+ALIASES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "place-aliases.json")
+
+
+def load_aliases():
+    """Curated same-place spellings the automatic fold cannot see (Dabdi/Dabri, ...)."""
+    try:
+        with open(ALIASES_PATH, encoding="utf-8") as fh:
+            raw = json.load(fh)
+    except FileNotFoundError:
+        return {"tehsil": {}, "village": {}}
+    return {f: {place_key(k): v for k, v in (raw.get(f) or {}).items()} for f in ("tehsil", "village")}
+
+
+def _tidy_display(v):
+    """'JOBNER' -> 'Jobner', 'mahal' -> 'Mahal'; mixed case is left alone."""
+    if v and " " not in v and (v.isupper() or v.islower()) and v.isalpha() and len(v) > 2:
+        return v.capitalize()
+    return v
+
+
+def canonicalise_places(records, fields=("tehsil", "village")):
+    """Fold case/punctuation variants of a tehsil or village into one value."""
+    aliases = load_aliases()
+    report = {}
+    for field in fields:
+        before = {str(r.get(field) or "") for r in records}
+        groups = defaultdict(list)
+        for r in records:
+            groups[place_key(r.get(field))].append(str(r.get(field) or "").strip())
+        mapping = {}
+        for key, values in groups.items():
+            mapping[key] = "" if key == "" else _display_variant(Counter(values))
+        for r in records:
+            r[field] = _tidy_display(mapping[place_key(r.get(field))])
+        # curated aliases run after the fold, so one entry fixes every spelling
+        n_alias = 0
+        for r in records:
+            target = aliases.get(field, {}).get(place_key(r.get(field)))
+            if target:
+                r[field] = target
+                n_alias += 1
+        after = {str(r.get(field) or "") for r in records}
+        merged = len(before) - len(after)
+        report[field] = {"before": len(before), "after": len(after), "merged": merged,
+                         "alias_rows": n_alias}
+        if merged:
+            print(f"  {field:8s} {len(before)} -> {len(after)} distinct "
+                  f"({merged} variants merged, {n_alias} rows via aliases)")
+    return report
+
+
 def num(v):
     if v is None or v == "":
         return None
@@ -484,6 +567,7 @@ def main():
             except Exception as e:  # noqa: BLE001
                 print("skip", f, e)
     records.sort(key=lambda r: (r["name"] or "").lower())
+    places = canonicalise_places(records)
 
     complaints = load_complaints()
     matched, unmatched = link_complaints(records, complaints)
@@ -545,6 +629,8 @@ def main():
         "appStatus": dict(Counter(r["app"] for r in records)),
         "promoterTypes": dict(Counter(r["promoterType"] or "-" for r in records)),
         "tehsils": dict(Counter(r["tehsil"] or "-" for r in records).most_common()),
+        # how many spellings the portal shipped vs how many places remain after folding
+        "places": places,
         "years": dict(sorted(Counter(r["regYear"] for r in records if r["regYear"]).items())),
         "coverage": {f: coverage(records, f) for f in
                      ("saleable", "builtUp", "landArea", "units", "plotCount", "totalCost",

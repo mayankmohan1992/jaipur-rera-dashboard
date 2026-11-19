@@ -1,0 +1,20 @@
+{
+  "_comment": [
+    "Spelling variants the automatic fold cannot catch (they differ by letters, not",
+    "by case/space/punctuation). Keys are place_key() values of the folded name, so",
+    "they are lower-case alphanumerics only. Values are the name to publish.",
+    "Only add a pair here when it is the SAME place — 'Kalwad' and 'Kalwar' are two",
+    "different villages in Jaipur district and must stay apart."
+  ],
+  "tehsil": {
+    "mozmabad": "Mauzamabad",
+    "mojmabaad": "Mauzamabad",
+    "maujamabad": "Mauzamabad",
+    "jalsoo": "Jalsu",
+    "rampuradabdi": "Rampuradabri",
+    "renwal": "Kishangarh Renwal",
+    "phulera": "Phulera (Hq. Sambhar)",
+    "rajasvgramhirapuratehsil": "Rajasv Gram Hirapura"
+  },
+  "village": {}
+}
