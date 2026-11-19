@@ -61,7 +61,7 @@ jobs:
 
       - name: Probe portal reachability from this runner
         id: probe
-        run: python3 pipeline/preflight.py --github
+        run: python3 pipeline/preflight.py --github --soft
 
       - name: Explain a skip
         if: steps.probe.outputs.reachable != 'true'
