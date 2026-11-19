@@ -4,134 +4,150 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Jaipur RERA Dashboard — every registered project in Jaipur district</title>
-<meta name="description" content="Slicing and dicing of every RERA-registered real-estate project in Jaipur district: promoters, categories, areas, units, buildings and cases.">
+<meta name="description" content="A register of every RERA-registered real-estate project in Jaipur district: promoters, categories, areas, units, buildings and cases, read from the Rajasthan RERA public API.">
+<link rel="preload" href="fonts/public-sans-var.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/spectral-600.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
+<a class="skip" href="#main">Skip to the data</a>
+
 <header class="topbar" id="topbar">
   <div class="tb-row">
-    <div class="brand">Jaipur <span>RERA</span> Dashboard</div>
-    <div class="tb-meta" id="tbMeta">loading…</div>
+    <div>
+      <span class="brand-kicker">Rajasthan Real Estate Regulatory Authority · District Jaipur</span>
+      <div class="brand">Jaipur <span>RERA</span> register</div>
+    </div>
+    <div class="tb-meta" id="tbMeta" aria-live="polite">loading…</div>
     <div class="tb-spacer"></div>
-    <button class="btn" id="unitToggle" title="Switch area units">m² → ft²</button>
-    <button class="btn" id="export" title="Export the current selection as CSV">Export CSV</button>
-    <button class="btn" id="reset">Reset filters</button>
+    <button class="btn" id="unitToggle" aria-pressed="false" title="Areas are shown in square metres">Show in ft²</button>
+    <button class="btn" id="export" title="Download the current selection as CSV">Export CSV</button>
+
   </div>
-  <nav class="tabs">
-    <button class="tab on" data-tab="overview">Overview</button>
-    <button class="tab" data-tab="projects">Projects</button>
-    <button class="tab" data-tab="promoters">Promoters</button>
-    <button class="tab" data-tab="pivot">Group &amp; compare</button>
-    <button class="tab" data-tab="cases">Cases</button>
-    <button class="tab" data-tab="agents">Agents</button>
-    <button class="tab" data-tab="quality">Data quality</button>
+  <nav class="tabs" aria-label="Views">
+    <button class="tab on" data-tab="overview" aria-selected="true">Overview</button>
+    <button class="tab" data-tab="projects" aria-selected="false">Projects</button>
+    <button class="tab" data-tab="promoters" aria-selected="false">Promoters</button>
+    <button class="tab" data-tab="pivot" aria-selected="false">Group &amp; compare</button>
+    <button class="tab" data-tab="cases" aria-selected="false">Cases</button>
+    <button class="tab" data-tab="agents" aria-selected="false">Agents</button>
+    <button class="tab" data-tab="quality" aria-selected="false">Data quality</button>
   </nav>
 </header>
 
-<section class="filters">
-  <div class="f">
+<section class="filters" aria-label="Filters">
+  <div class="f span2">
     <label for="q">Search</label>
-    <input type="search" id="q" placeholder="project, promoter, registration no…" autocomplete="off">
+    <input type="search" id="q" placeholder="project, promoter or registration no." autocomplete="off">
   </div>
   <div class="f">
-    <label for="fYear">Year</label>
+    <label for="fYear">Registration year</label>
     <select id="fYear"></select>
-  </div>
-  <div class="f">
-    <label for="dateFrom">Custom period from</label>
-    <input type="date" id="dateFrom">
-  </div>
-  <div class="f">
-    <label for="dateTo">to</label>
-    <input type="date" id="dateTo">
   </div>
   <div class="f" style="position:relative">
     <label for="promPick">Promoter</label>
-    <input type="search" id="promPick" placeholder="type a promoter name…" autocomplete="off">
-    <div id="promList"></div>
-  </div>
-  <div class="f">
-    <label>Saleable (m²)</label>
-    <div style="display:flex;gap:5px">
-      <input class="num" id="minArea" type="number" placeholder="min">
-      <input class="num" id="maxArea" type="number" placeholder="max">
-    </div>
-  </div>
-  <div class="f">
-    <label>Units / plots</label>
-    <div style="display:flex;gap:5px">
-      <input class="num" id="minUnits" type="number" placeholder="min">
-      <input class="num" id="maxUnits" type="number" placeholder="max">
-    </div>
+    <input type="search" id="promPick" placeholder="name contains…" autocomplete="off">
+    <div id="promList" role="listbox" aria-label="Promoter matches"></div>
   </div>
   <div class="f">
     <label for="plotted">Inventory</label>
     <select id="plotted">
-      <option value="any">All</option>
-      <option value="built">Built (flats/shops)</option>
-      <option value="plotted">Plotted</option>
+      <option value="any">Everything</option>
+      <option value="built">Built — flats, shops</option>
+      <option value="plotted">Plotted development</option>
     </select>
   </div>
-  <div class="f" style="justify-content:flex-end">
-    <label>&nbsp;</label>
-    <label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:12px;color:var(--fg)">
-      <input type="checkbox" id="casesOnly" style="min-height:auto;width:14px;height:14px"> has cases
-    </label>
+  <div class="f check">
+    <label for="casesOnly"><input type="checkbox" id="casesOnly"> Only promoters with cases</label>
   </div>
-  <div class="f" style="flex-basis:100%">
-    <label>Category</label>
-    <div class="chipset" id="fCats"></div>
+  <div class="f wide">
+    <details class="more" id="moreFilters">
+      <summary>Date range, area, category, status, tehsil <span id="moreCount"></span></summary>
+      <div class="more-body">
+  <div class="f">
+    <label for="dateFrom">Registered from</label>
+    <input type="date" id="dateFrom">
   </div>
-  <div class="f" style="flex-basis:100%">
-    <label>Status</label>
-    <div class="chipset" id="fStatus"></div>
+  <div class="f">
+    <label for="dateTo">Registered to</label>
+    <input type="date" id="dateTo">
   </div>
-  <div class="f" style="flex-basis:100%">
-    <label>Tehsil</label>
-    <div class="chipset" id="fTehsil"></div>
+  <div class="f">
+    <label for="minArea">Saleable area (m²)</label>
+    <div class="pair">
+      <input class="num" id="minArea" type="number" inputmode="numeric" placeholder="min" aria-label="Minimum saleable area">
+      <input class="num" id="maxArea" type="number" inputmode="numeric" placeholder="max" aria-label="Maximum saleable area">
+    </div>
   </div>
-  <div class="f" style="flex-basis:100%">
-    <div id="fActive" class="mini dim" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"></div>
+  <div class="f">
+    <label for="minUnits">Units or plots</label>
+    <div class="pair">
+      <input class="num" id="minUnits" type="number" inputmode="numeric" placeholder="min" aria-label="Minimum units or plots">
+      <input class="num" id="maxUnits" type="number" inputmode="numeric" placeholder="max" aria-label="Maximum units or plots">
+    </div>
+  </div>
+        <div class="f wide">
+          <label id="lblCats">Category</label>
+          <div class="chipset" id="fCats" role="group" aria-labelledby="lblCats"></div>
+        </div>
+        <div class="f wide">
+          <label id="lblStatus">Status</label>
+          <div class="chipset" id="fStatus" role="group" aria-labelledby="lblStatus"></div>
+        </div>
+        <div class="f wide">
+          <label id="lblTehsil">Tehsil</label>
+          <div class="chipset" id="fTehsil" role="group" aria-labelledby="lblTehsil"></div>
+        </div>
+      </div>
+    </details>
+  </div>
+  <div class="f wide active-row">
+    <div id="fActive" class="mini dim" aria-live="polite"></div>
+    <button class="btn quiet" id="reset2" hidden>Clear all filters</button>
   </div>
 </section>
 
 <main id="main">
-  <div class="kpis" id="kpis"></div>
+  <div class="tape" id="kpis"></div>
 
   <section class="view on" id="view-overview">
     <div class="grid2">
-      <div class="card"><h3>Registrations per year <em>— count of projects</em></h3>
-        <div class="chart-box"><canvas id="cYear"></canvas></div></div>
-      <div class="card"><h3>Saleable area registered per year <em>— sq m</em></h3>
-        <div class="chart-box"><canvas id="cArea"></canvas></div></div>
+      <div class="card"><h3>Registrations per year <em>projects · 2026 partial</em></h3>
+        <div class="chart-box"><canvas id="cYear" role="img" aria-label="Bar chart of projects registered per year"></canvas></div></div>
       <div class="card"><h3>Category mix</h3>
-        <div class="chart-box"><canvas id="cCat"></canvas></div></div>
-      <div class="card"><h3>Tehsils <em>— project count</em></h3>
-        <div class="chart-box"><canvas id="cTehsil"></canvas></div></div>
+        <div class="chart-box"><canvas id="cCat" role="img" aria-label="Category mix of projects"></canvas></div></div>
+    </div>
+    <div class="grid2 even">
+      <div class="card"><h3>Saleable area registered per year <em>m²</em></h3>
+        <div class="chart-box"><canvas id="cArea" role="img" aria-label="Saleable area registered per year"></canvas></div></div>
+      <div class="card"><h3>Tehsils <em>project count</em></h3>
+        <div class="chart-box"><canvas id="cTehsil" role="img" aria-label="Projects per tehsil"></canvas></div></div>
+    </div>
+    <div class="grid2 even">
       <div class="card"><h3>Top promoters by project count</h3>
-        <div class="chart-box"><canvas id="cProm"></canvas></div></div>
-      <div class="card"><h3>Top promoters by saleable area <em>— sq m</em></h3>
-        <div class="chart-box"><canvas id="cPromArea"></canvas></div></div>
+        <div class="chart-box"><canvas id="cProm" role="img" aria-label="Promoters ranked by project count"></canvas></div></div>
+      <div class="card"><h3>Top promoters by saleable area <em>m²</em></h3>
+        <div class="chart-box"><canvas id="cPromArea" role="img" aria-label="Promoters ranked by saleable area"></canvas></div></div>
     </div>
   </section>
 
   <section class="view" id="view-projects">
-    <div class="card" style="padding:0;border:none;background:transparent">
-      <div class="mini dim" style="margin:0 0 8px" id="projCount"></div>
+    <div>
+      <p class="count" id="projCount" aria-live="polite"></p>
       <div class="tbl-wrap" id="tblProjects"></div>
     </div>
   </section>
 
   <section class="view" id="view-promoters">
-    <div class="card" style="padding:0;border:none;background:transparent">
-      <div class="mini dim" style="margin:0 0 8px" id="promCount"></div>
+    <div>
+      <p class="count" id="promCount" aria-live="polite"></p>
       <div class="tbl-wrap" id="tblPromoters"></div>
     </div>
   </section>
 
   <section class="view" id="view-pivot">
-    <div class="card" style="margin-bottom:12px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+    <div class="filters" style="border:1px solid var(--rule);padding:14px 16px;border-radius:2px">
       <div class="f">
         <label for="pRow">Group by</label>
         <select id="pRow">
@@ -146,7 +162,7 @@
         </select>
       </div>
       <div class="f">
-        <label for="pMetric">Rank / show by</label>
+        <label for="pMetric">Rank by</label>
         <select id="pMetric">
           <option value="saleable">Saleable area</option>
           <option value="builtUp">Built-up area</option>
@@ -160,51 +176,54 @@
           <option value="openSpace">Open space</option>
         </select>
       </div>
-      <div class="mini dim" id="pivotNote" style="padding-bottom:8px"></div>
+      <div class="f" style="justify-content:flex-end">
+        <span class="mini dim" id="pivotNote" style="padding-bottom:6px"></span>
+      </div>
     </div>
     <div class="tbl-wrap" id="tblPivot"></div>
   </section>
 
   <section class="view" id="view-cases">
-    <div class="mini dim" style="margin:0 0 8px" id="caseCount"></div>
+    <p class="count" id="caseCount" aria-live="polite"></p>
     <div class="tbl-wrap" id="tblCases" style="max-height:70vh;overflow:auto"></div>
   </section>
 
   <section class="view" id="view-agents">
-    <div class="mini dim" style="margin:0 0 8px" id="agentCount"></div>
+    <p class="count" id="agentCount" aria-live="polite"></p>
     <div class="tbl-wrap" id="tblAgents" style="max-height:70vh;overflow:auto"></div>
   </section>
 
   <section class="view" id="view-quality">
-    <div class="grid2">
-      <div class="card"><h3>Field coverage across all Jaipur projects</h3><div id="covTable"></div></div>
-      <div class="card"><h3>Complaint register</h3><div id="caseQuality"></div></div>
+    <div class="grid2 even">
+      <div class="card"><h3>Field coverage <em>all Jaipur projects</em></h3><div id="covTable"></div></div>
+      <div class="card"><h3>Complaint register <em>statewide</em></h3><div id="caseQuality"></div></div>
     </div>
-    <div class="card" style="margin-top:12px">
-      <h3>How to read this data</h3>
-      <p class="mini dim" style="margin:0 0 8px">
-        Everything here is fetched from the JSON endpoints that back
-        <a href="https://rera.rajasthan.gov.in/" target="_blank" rel="noopener">rera.rajasthan.gov.in</a> —
-        the project master list, each project's Form-A/Form-B payload, the unit/plot inventory,
-        the cost estimate, the document register and the statewide complaint register.
-        Nothing is read out of the PDFs (approval letters, sanctioned plans, drawings); only table data is used.
+    <div class="card">
+      <h3>How to read this register</h3>
+      <p class="mini dim" style="margin:0 0 10px;max-width:78ch">
+        Every figure comes from the JSON endpoints behind
+        <a href="https://rera.rajasthan.gov.in/" target="_blank" rel="noopener">rera.rajasthan.gov.in</a>:
+        the project master list, each project's Form-A and Form-B payload, the unit and plot inventory,
+        the cost estimate, the document register and the statewide complaint register. Nothing is read out
+        of PDFs — approval letters, sanctioned plans and drawings are excluded.
       </p>
-      <p class="mini dim" style="margin:0">
-        Areas are square metres, the portal's native unit (switch to sq ft in the header).
-        A blank area means the promoter filed a zero or left the field empty — that is a data gap on the
-        portal, not a zero-area project. “Built-up (FSI)” and “saleable” are separate Form-B heads and
-        are frequently different (or one of them zero).
+      <p class="mini dim" style="margin:0;max-width:78ch">
+        Areas are square metres, the portal's native unit; switch to square feet in the header.
+        A blank area means the promoter filed zero or left the field empty — a gap on the portal, not a
+        zero-area project. “Built-up (FSI)” and “saleable” are separate Form-B heads and often differ,
+        or one of them is zero.
       </p>
     </div>
   </section>
 </main>
 
-<div class="modal-bg" id="modalBg"><div class="modal" id="modalBody"></div></div>
-<div class="toast" id="toast"></div>
+<div class="modal-bg" id="modalBg"><div class="modal" id="modalBody" role="dialog" aria-modal="true"></div></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <footer>
-  Data © RERA Rajasthan. Dashboard built from the portal's public JSON APIs; refreshed daily by a GitHub Action.
-  Not an official RERA publication — verify against the portal before relying on any figure.
+  Data © RERA Rajasthan. A convenience layer over the authority's public JSON — not an official
+  RERA publication. Verify against the portal before relying on any figure.
+  Refreshed by <code>scripts/refresh.sh</code>; every run is gated on a row-count check.
 </footer>
 
 <script src="app.js"></script>

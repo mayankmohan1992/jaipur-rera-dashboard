@@ -58,6 +58,12 @@ function catClass(c) {
   if (u.includes('MIXED')) return 'mx';
   return '';
 }
+if (window.matchMedia) {
+  const mq = window.matchMedia('(prefers-color-scheme: dark)');
+  const redraw = () => { if (typeof render === 'function' && PROJECTS.length) render(); };
+  mq.addEventListener ? mq.addEventListener('change', redraw) : mq.addListener(redraw);
+}
+
 function toast(msg) {
   const t = $('#toast');
   t.textContent = msg;
@@ -84,26 +90,30 @@ async function boot() {
   renderHeader();
   buildFilterUI();
   wire();
+  const h = (location.hash || '').replace('#', '');
+  if (h && document.querySelector('.tab[data-tab="' + h + '"]')) state.tab = h;
   render();
 }
 
 function renderHeader() {
-  const t = META.totals;
-  $('#tbMeta').innerHTML =
-    `<b>${n0(t.projects)}</b> projects · <b>${n0(t.promoters)}</b> promoters · ` +
-    `<b>${n0(t.units)}</b> units · <b>${n0(t.plots)}</b> plots · ` +
-    `saleable <b>${n0(t.saleable)}</b> m² · as of ${esc((META.asOf || '').replace('T', ' '))}`;
+  const d = new Date((META.asOf || '').replace(' ', 'T'));
+  const stamp = isNaN(d) ? (META.asOf || '') : d.toLocaleString('en-IN', {
+    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    timeZone: 'Asia/Kolkata',
+  }) + ' IST';
+  $('#tbMeta').innerHTML = `Register as of <b>${esc(stamp)}</b><br>` +
+    `Source: RERA Rajasthan public API · district 1077`;
 }
 
 /* ----------------------------------------------------------------- filters */
 function buildFilterUI() {
   const cats = Object.entries(META.category).sort((a, b) => b[1] - a[1]);
   $('#fCats').innerHTML = cats.map(([k, v]) =>
-    `<span class="chip" data-cat="${esc(k)}">${esc(k)}<small>${n0(v)}</small></span>`).join('');
+    `<span class="chip" data-cat="${esc(k)}" role="button" aria-pressed="false">${esc(k)}<small>${n0(v)}</small></span>`).join('');
 
   const sts = Object.entries(META.status).sort((a, b) => b[1] - a[1]);
   $('#fStatus').innerHTML = sts.map(([k, v]) =>
-    `<span class="chip" data-status="${esc(k)}">${esc(k || '—')}<small>${n0(v)}</small></span>`).join('');
+    `<span class="chip" data-status="${esc(k)}" role="button" aria-pressed="false">${esc(statusLabel(k))}<small>${n0(v)}</small></span>`).join('');
 
   const yrs = Object.keys(META.years).sort().reverse();
   $('#fYear').innerHTML = '<option value="">All years</option>' +
@@ -111,7 +121,7 @@ function buildFilterUI() {
 
   const teh = Object.entries(META.tehsils).filter(([k]) => k && k !== '-').slice(0, 40);
   $('#fTehsil').innerHTML = teh.map(([k, v]) =>
-    `<span class="chip" data-tehsil="${esc(k)}">${esc(k)}<small>${n0(v)}</small></span>`).join('');
+    `<span class="chip" data-tehsil="${esc(k)}" role="button" aria-pressed="false">${esc(k)}<small>${n0(v)}</small></span>`).join('');
 
 }
 
@@ -150,7 +160,11 @@ function filtered() {
 
 /* ------------------------------------------------------------------- render */
 function render() {
-  $$('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === state.tab));
+  $$('.tab').forEach(t => {
+    const on = t.dataset.tab === state.tab;
+    t.classList.toggle('on', on);
+    t.setAttribute('aria-selected', String(on));
+  });
   $$('.view').forEach(v => v.classList.toggle('on', v.id === 'view-' + state.tab));
   const rows = filtered();
   renderKpis(rows);
@@ -162,14 +176,18 @@ function render() {
   if (state.tab === 'agents') renderAgents();
   if (state.tab === 'quality') renderQuality();
   $('#fActive').innerHTML = activeFilterChips();
+  const chipFilters = state.cats.size + state.statuses.size + state.tehsils.size;
+  if ($('#moreCount')) $('#moreCount').textContent = chipFilters ? `${chipFilters} applied` : '';
+  if ($('#moreFilters') && chipFilters) $('#moreFilters').open = true;
+  if ($('#reset2')) $('#reset2').hidden = !$('#fActive').innerHTML;
 }
 
 function activeFilterChips() {
   const out = [];
-  const add = (label, fn) => out.push(`<span class="pill" style="cursor:pointer" data-clear="${fn}">${label} ✕</span>`);
+  const add = (label, fn) => out.push(`<button class="chip" data-clear="${fn}">${label} ×</button>`);
   if (state.q) add('search: ' + esc(state.q), 'q');
   state.cats.forEach(c => add(esc(c), 'cat:' + c));
-  state.statuses.forEach(c => add(esc(c || '—'), 'status:' + c));
+  state.statuses.forEach(c => add(esc(statusLabel(c)), 'status:' + c));
   state.tehsils.forEach(c => add(esc(c), 'tehsil:' + c));
   state.prom.forEach(c => add(esc(c), 'prom:' + c));
   if (state.year) add('year: ' + state.year, 'year');
@@ -178,7 +196,7 @@ function activeFilterChips() {
   if (state.minUnits != null || state.maxUnits != null) add(`units ${state.minUnits ?? 0}–${state.maxUnits ?? '∞'}`, 'units');
   if (state.casesOnly) add('has cases', 'cases');
   if (state.plotted !== 'any') add(state.plotted, 'plotted');
-  return out.length ? out.join(' ') + ' <span class="pill" style="cursor:pointer" data-clear="all">clear all</span>' : '';
+  return out.length ? out.join(' ') + ' <button class="chip" data-clear="all">Clear all</button>' : '';
 }
 
 function sum(rows, f) { return rows.reduce((a, r) => a + (f(r) || 0), 0); }
@@ -191,22 +209,66 @@ function renderKpis(rows) {
   const cases = casesFor(rows).length;
   const filled = (f) => rows.length ? Math.round(100 * rows.filter(r => r[f]).length / rows.length) : 0;
   const k = [
-    ['Projects', n0(rows.length), `${n0(gh)} built · ${n0(plotted)} plotted`],
-    ['Promoters', n0(new Set(rows.map(r => r.promoterKey).filter(Boolean)).size), 'distinct names'],
-    ['Saleable area', area(sum(rows, r => r.saleable)), `${areaUnit()} · filed by ${filled('saleable')}% of these`],
-    ['Built-up (FSI)', area(sum(rows, r => r.builtUp)), `${areaUnit()} · filed by ${filled('builtUp')}%`],
-    ['Land / plot area', area(sum(rows, r => r.landArea)), `${areaUnit()} · filed by ${filled('landArea')}%`],
-    ['Units', n0(units), `flats / shops · filed by ${filled('units')}%`],
-    ['Plots', n0(plots), `plotted inventory · filed by ${filled('plotCount')}%`],
-    ['Buildings', n0(sum(rows, r => r.buildings)), `${n0(rows.filter(r => r.bUnsanctioned).length)} declare unsanctioned`],
-    ['Est. cost', money(sum(rows, r => r.totalCost)), 'project cost (Form-B)'],
-    ['Cases (builder-level)', n0(cases), `${n0(rows.filter(r => r.casesProject + r.casesPromoter).length)} projects' promoters named`],
+    ['Projects', n0(rows.length), `${n0(gh)} built · ${n0(plotted)} plotted`, false],
+    ['Promoters', n0(new Set(rows.map(r => r.promoterKey).filter(Boolean)).size), 'distinct names', false],
+    ['Units', n0(units), `flats &amp; shops · ${filled('units')}% filed`, false],
+    ['Plots', n0(plots), `plotted inventory · ${filled('plotCount')}% filed`, false],
+    ['Saleable area', area(sum(rows, r => r.saleable)), `${areaUnit()} · ${filled('saleable')}% filed`, false],
+    ['Cases', n0(cases), 'statewide register · builder-level', cases > 0],
   ];
-  $('#kpis').innerHTML = k.map(([a, b, c]) =>
-    `<div class="kpi"><div class="k">${a}</div><div class="v">${b}</div><div class="s">${c || ''}</div></div>`).join('');
+  $('#kpis').innerHTML = k.map(([a, b, c, hot]) =>
+    `<div class="fig${hot ? ' is-accent' : ''}"><div class="k">${a}</div>` +
+    `<div class="v">${b}</div><div class="s">${c}</div></div>`).join('');
+}
+
+function compact(v) {
+  const a = Math.abs(v);
+  if (a >= 1e7) return (v / 1e7).toFixed(a >= 1e8 ? 0 : 1).replace(/\.0$/, '') + 'Cr';
+  if (a >= 1e5) return (v / 1e5).toFixed(a >= 1e6 ? 0 : 1).replace(/\.0$/, '') + 'L';
+  if (a >= 1000) return (v / 1000).toFixed(a >= 1e4 ? 0 : 1).replace(/\.0$/, '') + 'k';
+  return String(Math.round(v));
+}
+
+function niceStep(x) {
+  if (!isFinite(x) || x <= 0) return 1;
+  const mag = Math.pow(10, Math.floor(Math.log10(x)));
+  const n = x / mag;
+  const m = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10;
+  return m * mag;
+}
+
+function largestRemainder(fracs, total) {
+  const raw = fracs.map(f => f * total);
+  const out = raw.map(Math.floor);
+  let left = total - out.reduce((a, b) => a + b, 0);
+  raw.map((v, i) => [v - Math.floor(v), i]).sort((a, b) => b[0] - a[0])
+     .forEach(([, i]) => { if (left > 0) { out[i]++; left--; } });
+  return out;
+}
+
+/* the portal ships status strings in caps without spaces */
+const STATUS_WORDS = {
+  INPROGRESS: 'In progress', COMPLETED: 'Completed', LAPSED: 'Lapsed', REVOKED: 'Revoked',
+  SUSPENDED: 'Suspended', EXEMPTED: 'Exempted',
+  'COMPLETED & OC ISSUED': 'Completed, OC issued',
+};
+function statusLabel(s) {
+  const k = String(s || '').trim().toUpperCase().replace(/\s+/g, ' ');
+  return STATUS_WORDS[k] || (k ? k.charAt(0) + k.slice(1).toLowerCase() : '—');
 }
 
 /* ------------------------------------------------------------------- charts */
+function theme() {
+  const cs = getComputedStyle(document.documentElement);
+  const g = n => cs.getPropertyValue(n).trim();
+  return {
+    rule: g('--rule'), rule2: g('--rule-2'), muted: g('--muted'), faint: g('--faint'),
+    ink: g('--ink'), paper: g('--paper'), accent: g('--accent'),
+    series: [g('--s1'), g('--s2'), g('--s3'), g('--s4'), g('--s5'), g('--s6')],
+    cats: [g('--c1'), g('--c2'), g('--c3'), g('--c4')],
+  };
+}
+
 function setupCanvas(cv, cssH) {
   const dpr = window.devicePixelRatio || 1;
   const w = cv.parentElement.clientWidth || 400;
@@ -219,20 +281,23 @@ function setupCanvas(cv, cssH) {
   const ctx = cv.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
-  return { ctx, w, h };
+  return { ctx, w, h, t: theme() };
 }
 
 function drawBars(cv, labels, series, opts = {}) {
-  const { ctx, w, h } = setupCanvas(cv, opts.height || 210);
+  const { ctx, w, h, t } = setupCanvas(cv, opts.height || 210);
   const pad = { l: 52, r: 10, t: 10, b: 34 };
   const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
-  const max = Math.max(1, ...series.flatMap(s => s.values));
-  ctx.strokeStyle = '#1e2635'; ctx.lineWidth = 1;
-  ctx.fillStyle = '#63708a'; ctx.font = '10px ui-monospace, monospace';
-  for (let i = 0; i <= 4; i++) {
-    const y = pad.t + ih - (ih * i / 4);
+  const raw = Math.max(1, ...series.flatMap(s => s.values));
+  const step = niceStep(raw / 4);
+  const ticks = Math.max(1, Math.ceil(raw / step));
+  const max = step * ticks;
+  ctx.strokeStyle = t.rule; ctx.lineWidth = 1;
+  ctx.fillStyle = t.faint; ctx.font = '10px "Public Sans", sans-serif';
+  for (let i = 0; i <= ticks; i++) {
+    const y = pad.t + ih - (ih * i / ticks);
     ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke();
-    ctx.fillText(nf(0).format(Math.round(max * i / 4)), 4, y + 3);
+    ctx.fillText(compact(step * i), 4, y + 3);
   }
   const n = labels.length;
   const slot = iw / Math.max(n, 1);
@@ -242,14 +307,16 @@ function drawBars(cv, labels, series, opts = {}) {
     series.forEach((s, si) => {
       const v = s.values[i] || 0;
       const bh = (v / max) * ih;
+      ctx.globalAlpha = (opts.partialLast && i === n - 1) ? 0.4 : 1;
       ctx.fillStyle = s.color;
       ctx.fillRect(x0 + si * bw, pad.t + ih - bh, Math.max(bw - 1, 1), bh);
+      ctx.globalAlpha = 1;
     });
     if (n <= 26 || i % Math.ceil(n / 26) === 0) {
       ctx.save();
       ctx.translate(pad.l + slot * i + slot / 2, h - pad.b + 12);
       ctx.rotate(n > 14 ? -Math.PI / 4 : 0);
-      ctx.fillStyle = '#8b9ab1'; ctx.font = '10px ui-monospace, monospace';
+      ctx.fillStyle = t.muted; ctx.font = '10px "Public Sans", sans-serif';
       ctx.textAlign = n > 14 ? 'right' : 'center';
       ctx.fillText(lb, 0, 0);
       ctx.restore();
@@ -258,8 +325,9 @@ function drawBars(cv, labels, series, opts = {}) {
   return { max };
 }
 
-function drawHBar(cv, labels, values, color = '#4da3ff', height = 240) {
-  const { ctx, w, h } = setupCanvas(cv, height);
+function drawHBar(cv, labels, values, color = null, height = 240) {
+  const { ctx, w, h, t } = setupCanvas(cv, height);
+  const fill = color || t.s2;
   const pad = { l: 190, r: 60, t: 6, b: 6 };
   const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
   const max = Math.max(1, ...values);
@@ -267,19 +335,18 @@ function drawHBar(cv, labels, values, color = '#4da3ff', height = 240) {
   labels.forEach((lb, i) => {
     const y = pad.t + rowH * i;
     const bh = Math.min(rowH - 3, 16);
-    ctx.fillStyle = color; ctx.globalAlpha = .85;
+    ctx.fillStyle = fill;
     ctx.fillRect(pad.l, y + (rowH - bh) / 2, (values[i] / max) * iw, bh);
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = '#8b9ab1'; ctx.font = '10.5px ui-monospace, monospace'; ctx.textAlign = 'right';
+    ctx.fillStyle = t.muted; ctx.font = '11px "Public Sans", sans-serif'; ctx.textAlign = 'right';
     ctx.fillText(lb.length > 30 ? lb.slice(0, 29) + '…' : lb, pad.l - 8, y + rowH / 2 + 3);
-    ctx.textAlign = 'left'; ctx.fillStyle = '#c9d6e8';
+    ctx.textAlign = 'left'; ctx.fillStyle = t.ink;
     ctx.fillText(n0(values[i]), pad.l + (values[i] / max) * iw + 6, y + rowH / 2 + 3);
   });
   ctx.textAlign = 'left';
 }
 
 function drawDonut(cv, items, height = 200) {
-  const { ctx, w, h } = setupCanvas(cv, height);
+  const { ctx, w, h, t } = setupCanvas(cv, height);
   const total = items.reduce((a, b) => a + b.value, 0) || 1;
   const cx = Math.min(w * 0.33, 130), cy = h / 2, r = Math.min(cy - 10, 78);
   let a0 = -Math.PI / 2;
@@ -291,22 +358,28 @@ function drawDonut(cv, items, height = 200) {
     a0 = a1;
   });
   ctx.beginPath(); ctx.arc(cx, cy, r * 0.58, 0, Math.PI * 2);
-  ctx.fillStyle = '#121722'; ctx.fill();
-  ctx.fillStyle = '#e6edf7'; ctx.font = '600 15px -apple-system, sans-serif'; ctx.textAlign = 'center';
+  ctx.fillStyle = t.paper; ctx.fill();
+  ctx.fillStyle = t.ink; ctx.font = '600 17px Spectral, Georgia, serif'; ctx.textAlign = 'center';
   ctx.fillText(n0(total), cx, cy + 2);
-  ctx.fillStyle = '#63708a'; ctx.font = '9.5px -apple-system, sans-serif';
+  ctx.fillStyle = t.faint; ctx.font = '9px "Public Sans", sans-serif';
   ctx.fillText('PROJECTS', cx, cy + 16);
   ctx.textAlign = 'left';
   let ly = cy - items.length * 9;
-  items.forEach(it => {
+  const pcts = largestRemainder(items.map(it => it.value / total), 100);
+  items.forEach((it, idx) => {
     ctx.fillStyle = it.color; ctx.fillRect(cx + r + 22, ly - 7, 8, 8);
-    ctx.fillStyle = '#c9d6e8'; ctx.font = '11px -apple-system, sans-serif';
-    ctx.fillText(`${it.label}  ${n0(it.value)} (${Math.round(it.value / total * 100)}%)`, cx + r + 36, ly);
+    ctx.fillStyle = t.ink; ctx.font = '11px "Public Sans", sans-serif';
+    const lx = cx + r + 36;
+    ctx.fillText(it.label.length > 26 ? it.label.slice(0, 25) + '…' : it.label, lx, ly);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = t.muted;
+    ctx.fillText(`${n0(it.value)} · ${pcts[idx]}%`, w - 6, ly);
+    ctx.textAlign = 'left';
     ly += 18;
   });
 }
 
-const PALETTE = ['#4da3ff', '#21c08b', '#f5a524', '#c084fc', '#ef5f5f', '#4dd0e1', '#9ccc65', '#ff8a65'];
+const PALETTE = () => theme().series;
 
 /* ----------------------------------------------------------------- overview */
 function renderOverview(rows) {
@@ -321,10 +394,20 @@ function renderOverview(rows) {
     cats[r.cat] = (cats[r.cat] || 0) + 1;
   });
   const yl = Object.keys(years).sort();
-  drawBars($('#cYear'), yl, [{ values: yl.map(y => years[y].n), color: '#4da3ff' }]);
-  drawBars($('#cArea'), yl, [{ values: yl.map(y => years[y].saleable), color: '#21c08b' }]);
+  const pal = PALETTE();
+  drawBars($('#cYear'), yl, [{ values: yl.map(y => years[y].n), color: pal[0] }], { partialLast: true });
+  drawBars($('#cArea'), yl, [{ values: yl.map(y => years[y].saleable), color: pal[1] }]);
+  // saleable area is only filed by a minority of promoters; say so on the card
+  const areaCard = $('#cArea').closest('.card');
+  if (areaCard) {
+    const pctFiled = (META.coverage && META.coverage.saleable) ? META.coverage.saleable.pct : null;
+    const em = areaCard.querySelector('h3 em');
+    if (em && pctFiled != null) em.textContent = `${areaUnit()} · filed for ${pctFiled}% of projects`;
+  }
+  const shortCat = { 'Mixed (Residential And Commercial)': 'Mixed use' };
+  const catPal = theme().cats;
   drawDonut($('#cCat'), Object.entries(cats).sort((a, b) => b[1] - a[1])
-    .map(([k, v], i) => ({ label: k, value: v, color: PALETTE[i % PALETTE.length] })));
+    .map(([k, v], i) => ({ label: shortCat[k] || k, value: v, color: catPal[i % catPal.length] })));
 
   const byProm = {};
   rows.forEach(r => {
@@ -334,16 +417,16 @@ function renderOverview(rows) {
     byProm[r.promoterKey].saleable += r.saleable || 0;
   });
   const top = Object.values(byProm).sort((a, b) => b.n - a.n).slice(0, 15);
-  drawHBar($('#cProm'), top.map(t => t.name || '(unnamed)'), top.map(t => t.n), '#4da3ff', 260);
+  drawHBar($('#cProm'), top.map(t => t.name || '(unnamed)'), top.map(t => t.n), pal[0], 260);
 
   const topA = Object.values(byProm).sort((a, b) => b.saleable - a.saleable).slice(0, 15);
   drawHBar($('#cPromArea'), topA.map(t => t.name || '(unnamed)'),
-    topA.map(t => Math.round(t.saleable)), '#21c08b', 260);
+    topA.map(t => Math.round(t.saleable)), pal[1], 260);
 
   const teh = {};
   rows.forEach(r => { teh[r.tehsil || '—'] = (teh[r.tehsil || '—'] || 0) + 1; });
   drawHBar($('#cTehsil'), Object.entries(teh).sort((a, b) => b[1] - a[1]).slice(0, 15).map(x => x[0]),
-    Object.entries(teh).sort((a, b) => b[1] - a[1]).slice(0, 15).map(x => x[1]), '#c084fc', 260);
+    Object.entries(teh).sort((a, b) => b[1] - a[1]).slice(0, 15).map(x => x[1]), pal[0], 260);
 }
 
 /* ----------------------------------------------------------------- projects */
@@ -370,13 +453,14 @@ function renderProjects(rows) {
   const sorted = sortRows(rows, s);
   const shown = sorted.slice(0, state.limit);
   const head = COLS.map(([k, label, kind]) =>
-    `<th class="${kind === 'text' || kind === 'date' ? '' : 'r'}" data-sort="${k}">${label}` +
+    `<th scope="col" class="${kind === 'text' || kind === 'date' ? '' : 'r'}" data-sort="${k}"` +
+    (s.key === k ? ` aria-sort="${s.dir > 0 ? 'ascending' : 'descending'}"` : '') + `>${label}` +
     (s.key === k ? `<span class="ar">${s.dir > 0 ? '▲' : '▼'}</span>` : '') + '</th>').join('');
   const body = shown.map(p => `<tr class="click" data-id="${p.id}">
     <td class="wrap" style="max-width:280px;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</td>
     <td><span class="pill ${catClass(p.cat)}">${esc(p.cat)}</span></td>
     <td class="wrap" style="max-width:230px;overflow:hidden;text-overflow:ellipsis" title="${esc(p.promoter)}">${esc(p.promoter)}</td>
-    <td>${esc(p.status || p.app)}</td>
+    <td>${esc(statusLabel(p.status || p.app))}</td>
     <td class="mono">${p.regDate || '–'}</td>
     <td>${esc(p.tehsil)}</td>
     <td class="r">${area(p.landArea)}</td>
@@ -388,7 +472,9 @@ function renderProjects(rows) {
     <td class="r">${money(p.totalCost)}</td>
     <td class="r">${p.casesProject + p.casesPromoter ? n0(p.casesProject + p.casesPromoter) : '<span class="dim">0</span>'}</td>
   </tr>`).join('');
-  $('#tblProjects').innerHTML = `<table><thead><tr>${head}</tr></thead><tbody>${body || ''}</tbody></table>`;
+  $('#tblProjects').innerHTML = `<table><thead><tr>${head}</tr></thead><tbody>${body ||
+    `<tr><td colspan="${COLS.length}" class="empty"><b>No project matches these filters.</b>
+       Loosen a chip, or <button class="chip" data-clear="all">clear all filters</button> to see all ${n0(PROJECTS.length)}.</td></tr>`}</tbody></table>`;
   $('#projCount').innerHTML = `${n0(rows.length)} projects` +
     (rows.length > state.limit ? ` · showing first ${n0(state.limit)} — <a href="#" id="moreBtn">show all</a>` : '');
   if ($('#moreBtn')) $('#moreBtn').onclick = (e) => { e.preventDefault(); state.limit = 100000; render(); };
@@ -426,7 +512,9 @@ function renderPromoters(rows) {
     ['builtUp', 'Built-up', 'r'], ['land', 'Land', 'r'], ['units', 'Units', 'r'],
     ['plots', 'Plots', 'r'], ['cost', 'Cost', 'r'], ['cases', 'Cases', 'r'],
     ['first', 'First reg', ''], ['last', 'Last reg', '']];
-  const head = cols.map(([k, l, c]) => `<th class="${c}" data-psort="${k}">${l}${s.key === k ? `<span class="ar">${s.dir > 0 ? '▲' : '▼'}</span>` : ''}</th>`).join('');
+  const head = cols.map(([k, l, c]) => `<th scope="col" class="${c}" data-psort="${k}"` +
+    (s.key === k ? ` aria-sort="${s.dir > 0 ? 'ascending' : 'descending'}"` : '') +
+    `>${l}${s.key === k ? `<span class="ar">${s.dir > 0 ? '▲' : '▼'}</span>` : ''}</th>`).join('');
   const body = list.map(x => `<tr class="click" data-prom="${esc(x.key)}">
     <td class="wrap" style="max-width:340px;overflow:hidden;text-overflow:ellipsis" title="${esc(x.name)}">${esc(x.name)}</td>
     <td class="r">${n0(x.n)}</td>
@@ -628,8 +716,8 @@ async function openDetail(id) {
   const cases = COMPLAINTS.filter(c => c.match && ((c.match.type === 'project' && c.match.id === p.id) ||
     (c.match.ids || []).includes(p.id)));
   const kv = [
-    ['Registration', p.regNo], ['Application', det && det.appNo], ['Category', p.cat],
-    ['Status', p.status || p.app], ['Registered', p.regDate], ['Approved', det && det.approvedOn],
+    ['Application', det && det.appNo], ['Category', p.cat],
+    ['Status', statusLabel(p.status || p.app)], ['Registered', p.regDate], ['Approved', det && det.approvedOn],
     ['Original completion', p.completion], ['Revised completion', p.revCompletion],
     ['Tehsil', p.tehsil], ['Village', p.village], ['PIN', p.pin],
     ['Promoter type', p.promoterType], ['Org type', det && det.promoterOrgType],
@@ -658,7 +746,7 @@ async function openDetail(id) {
   const cost = det && det.costDetail ? det.costDetail.filter(c => (c.e || 0) > 0) : [];
 
   $('#modalBody').innerHTML = `
-    <button class="x" id="mClose">✕</button>
+    <button class="x" id="mClose" aria-label="Close project detail">Close</button>
     <h2>${esc(p.name)}</h2>
     <div class="sub">${esc(p.promoter)} · ${esc(p.cat)} · ${esc(p.regNo)} ·
       <a href="https://rera.rajasthan.gov.in/ProjectDetail?id=${esc(p.encId || '')}&type=U" target="_blank" rel="noopener">portal page ↗</a></div>
@@ -668,26 +756,31 @@ async function openDetail(id) {
     <h4>Areas (${areaUnit()})</h4>
     <div class="kv">${areaRows.filter(x => x[1]).map(([a, b]) => `<div><span>${a}</span><span>${area(b)}</span></div>`).join('')}</div>
 
-    <h4>Building configuration</h4>
-    <div class="kv">${bRows.filter(x => x[1]).map(([a, b]) => `<div><span>${a}</span><span>${esc(b)}</span></div>`).join('')}</div>
+    ${bRows.filter(x => x[1]).length ? `<h4>Building configuration</h4>
+    <div class="kv">${bRows.filter(x => x[1]).map(([a, b]) => `<div><span>${a}</span><span>${esc(b)}</span></div>`).join('')}</div>`
+      : `<h4>Building configuration</h4>
+    <p class="mini dim" style="margin:0 0 4px">Nothing to configure: this is a plotted layout with
+      ${n0(p.plotCount)} plots and no built inventory.</p>`}
 
     <h4>Unit inventory — ${n0(p.units)} units, ${n0(p.plotCount)} plots</h4>
-    <div class="tbl-wrap" style="max-height:260px;overflow:auto">
+    <div class="tbl-wrap">
       <table class="mini"><thead><tr><th>Unit type</th><th class="r">Count</th><th class="r">Carpet (${areaUnit()})</th></tr></thead>
       <tbody>${Object.entries(mix).sort((a, b) => b[1].n - a[1].n).slice(0, 40).map(([k, v]) =>
         `<tr><td class="wrap">${esc(k)}</td><td class="r">${n0(v.n)}</td><td class="r">${area(v.carpet, 1)}</td></tr>`).join('')
-      || '<tr><td colspan="3" class="dim">No unit rows published.</td></tr>'}</tbody></table>
+      || `<tr><td colspan="3" class="empty">The promoter filed no unit-type rows for this project${
+        p.plotCount ? '; inventory is by plot, below.' : '.'}</td></tr>`}</tbody></table>
     </div>
     ${plInv.length ? `<div class="kv" style="margin-top:8px">
       <div><span>Plot sizes</span><span>${area(p.plotMin, 1)} – ${area(p.plotMax, 1)} ${areaUnit()}</span></div>
-      <div><span>Sold / unsold</span><span>${n0(p.sold)} / ${n0(p.unsold)}</span></div></div>` : ''}
+      <div><span>Sold / unsold</span><span>${
+        (p.sold || p.unsold) ? `${n0(p.sold)} / ${n0(p.unsold)}` : 'Not filed'}</span></div></div>` : ''}
 
     <h4>Cost estimate (Form-B)</h4>
-    <div class="tbl-wrap" style="max-height:220px;overflow:auto">
+    <div class="tbl-wrap">
       <table class="mini"><thead><tr><th>Head</th><th class="r">Estimated</th><th class="r">Actual</th></tr></thead>
-      <tbody>${cost.slice(0, 30).map(c => `<tr><td class="wrap">${esc((c.n || '').slice(0, 120))}</td>
+      <tbody>${cost.slice(0, 30).map(c => `<tr><td class="wrap" style="min-width:280px">${esc(c.n || '')}</td>
         <td class="r">${money(c.e)}</td><td class="r">${money(c.a)}</td></tr>`).join('') ||
-        '<tr><td colspan="3" class="dim">No cost rows published.</td></tr>'}</tbody></table>
+        '<tr><td colspan="3" class="dim">No cost rows were filed under Form-B.</td></tr>'}</tbody></table>
     </div>
 
     <h4>Compliance & documents</h4>
@@ -765,25 +858,29 @@ function syncInputs() {
 function debounce(fn, ms = 220) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
 
 function wire() {
-  $$('.tab').forEach(t => t.onclick = () => { state.tab = t.dataset.tab; render(); });
+  $$('.tab').forEach(t => t.onclick = () => {
+    state.tab = t.dataset.tab;
+    history.replaceState(null, '', '#' + state.tab);
+    render();
+  });
   $('#q').oninput = debounce(e => { state.q = e.target.value; render(); });
   $('#fCats').onclick = (e) => {
     const c = e.target.closest('[data-cat]'); if (!c) return;
     const k = c.dataset.cat;
     state.cats.has(k) ? state.cats.delete(k) : state.cats.add(k);
-    c.classList.toggle('on'); render();
+    c.classList.toggle('on'); c.setAttribute('aria-pressed', String(c.classList.contains('on'))); render();
   };
   $('#fStatus').onclick = (e) => {
     const c = e.target.closest('[data-status]'); if (!c) return;
     const k = c.dataset.status;
     state.statuses.has(k) ? state.statuses.delete(k) : state.statuses.add(k);
-    c.classList.toggle('on'); render();
+    c.classList.toggle('on'); c.setAttribute('aria-pressed', String(c.classList.contains('on'))); render();
   };
   $('#fTehsil').onclick = (e) => {
     const c = e.target.closest('[data-tehsil]'); if (!c) return;
     const k = c.dataset.tehsil;
     state.tehsils.has(k) ? state.tehsils.delete(k) : state.tehsils.add(k);
-    c.classList.toggle('on'); render();
+    c.classList.toggle('on'); c.setAttribute('aria-pressed', String(c.classList.contains('on'))); render();
   };
   $('#fYear').onchange = (e) => { state.year = e.target.value; state.dateFrom = state.dateTo = ''; syncInputs(); render(); };
   $('#dateFrom').onchange = (e) => { state.dateFrom = e.target.value; state.year = ''; syncInputs(); render(); };
@@ -795,11 +892,15 @@ function wire() {
   numIn('minUnits', 'minUnits'); numIn('maxUnits', 'maxUnits');
   $('#casesOnly').onchange = (e) => { state.casesOnly = e.target.checked; render(); };
   $('#plotted').onchange = (e) => { state.plotted = e.target.value; render(); };
-  $('#reset').onclick = resetFilters;
+  const doReset = () => resetFilters();
+  if ($('#reset')) $('#reset').onclick = doReset;
+  if ($('#reset2')) $('#reset2').onclick = doReset;
   $('#export').onclick = exportCsv;
   $('#unitToggle').onclick = () => {
     state.unit = state.unit === 'sqm' ? 'sqft' : 'sqm';
-    $('#unitToggle').textContent = state.unit === 'sqm' ? 'm² → ft²' : 'ft² → m²';
+    const toSqft = state.unit === 'sqm';
+    $('#unitToggle').textContent = toSqft ? 'Show in ft²' : 'Show in m²';
+    $('#unitToggle').setAttribute('aria-pressed', String(!toSqft));
     render();
   };
   $('#fActive').onclick = (e) => {
