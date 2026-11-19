@@ -459,15 +459,10 @@ canvas { display: block; width: 100%; }
 .tbl-wrap::-webkit-scrollbar { height: 8px; }
 .tbl-wrap::-webkit-scrollbar-thumb { background: var(--rule-2); }
 .tbl-wrap::-webkit-scrollbar-track { background: var(--rule); }
-/* only drawn when the table really overflows sideways (toggled in app.js) */
-.tbl-wrap.is-scrollable::after {
-  content: "";
-  position: absolute;
-  top: 0; right: 0; bottom: 0;
-  width: 44px;
-  pointer-events: none;
-  background: linear-gradient(to right, transparent, var(--paper) 70%);
-  border-right: 1px solid var(--rule);
+/* scroll shadow: an inset shadow paints against the scrollport, so it stays at the
+   visible edge instead of travelling with the content. Toggled in app.js. */
+.tbl-wrap.is-scrollable {
+  box-shadow: inset -16px 0 14px -14px rgba(25, 23, 18, .55);
 }
 table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
 thead th {

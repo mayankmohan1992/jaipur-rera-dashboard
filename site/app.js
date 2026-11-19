@@ -499,6 +499,17 @@ function renderProjects(rows) {
     render();
   });
   $$('#tblProjects tbody tr').forEach(tr => tr.onclick = () => openDetail(tr.dataset.id));
+  requestAnimationFrame(() => {
+    const box = $('#tblProjects');
+    if (box.scrollWidth > box.clientWidth + 2) {
+      const c = $('#projCount');
+      if (c && !c.dataset.hinted) {
+        c.dataset.hinted = '1';
+        c.insertAdjacentHTML('beforeend',
+          ' <span class="dim">· scroll sideways for cost and cases</span>');
+      }
+    }
+  });
 }
 
 /* ---------------------------------------------------------------- promoters */
