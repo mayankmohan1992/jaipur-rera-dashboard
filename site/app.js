@@ -58,6 +58,12 @@ function catClass(c) {
   if (u.includes('MIXED')) return 'mx';
   return '';
 }
+let _rsz;
+window.addEventListener('resize', () => {
+  clearTimeout(_rsz);
+  _rsz = setTimeout(() => $$('.tbl-wrap').forEach(markScrollable), 120);
+});
+
 if (window.matchMedia) {
   const mq = window.matchMedia('(prefers-color-scheme: dark)');
   const redraw = () => { if (typeof render === 'function' && PROJECTS.length) render(); };
@@ -159,6 +165,14 @@ function filtered() {
 }
 
 /* ------------------------------------------------------------------- render */
+function markScrollable(el) {
+  if (!el) return;
+  const box = el.closest('.tbl-wrap') || el;
+  requestAnimationFrame(() => {
+    box.classList.toggle('is-scrollable', box.scrollWidth > box.clientWidth + 2);
+  });
+}
+
 function render() {
   $$('.tab').forEach(t => {
     const on = t.dataset.tab === state.tab;
@@ -175,6 +189,7 @@ function render() {
   if (state.tab === 'cases') renderCases(rows);
   if (state.tab === 'agents') renderAgents();
   if (state.tab === 'quality') renderQuality();
+  $$('.tbl-wrap').forEach(markScrollable);
   $('#fActive').innerHTML = activeFilterChips();
   const chipFilters = state.cats.size + state.statuses.size + state.tehsils.size;
   if ($('#moreCount')) $('#moreCount').textContent = chipFilters ? `${chipFilters} applied` : '';

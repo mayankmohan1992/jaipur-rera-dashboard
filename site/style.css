@@ -459,14 +459,15 @@ canvas { display: block; width: 100%; }
 .tbl-wrap::-webkit-scrollbar { height: 8px; }
 .tbl-wrap::-webkit-scrollbar-thumb { background: var(--rule-2); }
 .tbl-wrap::-webkit-scrollbar-track { background: var(--rule); }
-/* the table is wider than the page: say so at the edge */
-.tbl-wrap::after {
+/* only drawn when the table really overflows sideways (toggled in app.js) */
+.tbl-wrap.is-scrollable::after {
   content: "";
   position: absolute;
   top: 0; right: 0; bottom: 0;
-  width: 22px;
+  width: 44px;
   pointer-events: none;
-  background: linear-gradient(to right, transparent, var(--paper));
+  background: linear-gradient(to right, transparent, var(--paper) 70%);
+  border-right: 1px solid var(--rule);
 }
 table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
 thead th {
@@ -491,6 +492,7 @@ thead th .ar { color: var(--accent); margin-left: 4px; }
 thead th.r, td.r { text-align: right; }
 tbody td {
   padding: 6px 10px;
+  vertical-align: middle;
   border-bottom: 1px solid var(--rule);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -505,6 +507,8 @@ td.wrap {
   white-space: normal;
   min-width: 220px;
 }
+#tblProjects tbody td { height: 48px; }
+#tblPromoters tbody td { height: 40px; }
 tbody td.wrap:first-child,
 tbody td.wrap:nth-child(3) {
   display: -webkit-box;
