@@ -68,6 +68,13 @@ trap 'rm -rf "$pub"' EXIT
 cp -r site/. "$pub"/
 touch "$pub/.nojekyll"                    # no Jekyll pass, files serve as-is
 
+# Pages caches css/js at the edge for ten minutes, so a deploy can look like a
+# no-op. Stamp the asset URLs with the publish time and the cache follows.
+stamp=$(date -u +%Y%m%d%H%M)
+sed -i "s|href=\"style.css\"|href=\"style.css?v=$stamp\"|; s|src=\"app.js\"|src=\"app.js?v=$stamp\"|" \
+  "$pub/index.html"
+grep -q "style.css?v=$stamp" "$pub/index.html" || { echo "asset cache-bust failed" >&2; exit 1; }
+
 (
   cd "$pub"
   git init -q
