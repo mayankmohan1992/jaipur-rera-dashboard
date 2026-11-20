@@ -76,6 +76,7 @@ site/
   app.js           filtering, aggregation, charts, detail modal (no framework)
   style.css        paper/ink editorial theme, self-hosted type, dense tabular layout
   fonts/           Public Sans (variable) + Spectral, 73 KB total, no CDN
+                   light theme by default; the header toggle stores a dark choice in localStorage
   data/            generated: meta, projects, promoters, complaints, agents, timeseries,
                    detail/<id>.json per project, jaipur_rera.db
 docs/
