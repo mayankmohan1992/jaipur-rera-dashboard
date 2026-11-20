@@ -72,9 +72,13 @@
   --t: 140ms cubic-bezier(.23, 1, .32, 1);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* derived from the paper set, not an inversion */
+/* light is the default; dark is opt-in via the header toggle.
+   Tokens are derived from the paper set, never an inversion. */
+:root { color-scheme: light; }
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  /* derived from the paper set, not an inversion */
     --paper: #14120e;
     --surface: #1b1813;
     --sunk: #211d17;
@@ -98,8 +102,7 @@
     --c1: #ece5d6;
     --c2: #d4603f;
     --c3: #7fa88d;
-    --c4: #d0a05a;
-  }
+  --c4: #d0a05a;
 }
 
 * { box-sizing: border-box; }
@@ -265,7 +268,9 @@ a:hover { color: var(--accent); text-decoration-color: currentColor; }
 .f input:hover, .f select:hover { border-color: var(--ink-2); }
 .f input:focus, .f select:focus { border-color: var(--ink); }
 .f input::placeholder { color: var(--faint); }
-.f input[type="search"] { min-width: 210px; }
+.f input[type="search"] { min-width: 0; }
+.f.span2 input[type="search"] { min-width: 200px; }
+.f input, .f select { min-width: 0; }
 .f input[type="date"] { font-family: var(--sans); font-variant-numeric: tabular-nums; }
 .f .num { text-align: right; font-variant-numeric: tabular-nums; }
 .f .pair { display: flex; gap: 6px; }

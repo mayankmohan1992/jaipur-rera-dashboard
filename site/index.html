@@ -7,6 +7,12 @@
 <meta name="description" content="A register of every RERA-registered real-estate project in Jaipur district: promoters, categories, areas, units, buildings and cases, read from the Rajasthan RERA public API.">
 <link rel="preload" href="fonts/public-sans-var.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/spectral-600.woff2" as="font" type="font/woff2" crossorigin>
+<script>
+  /* Light is the default. Only a reader who chose dark before gets dark, and it
+     has to be applied before first paint or the page flashes. */
+  try { if (localStorage.getItem('jr-theme') === 'dark') document.documentElement.dataset.theme = 'dark'; }
+  catch (e) {}
+</script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -21,6 +27,7 @@
     </div>
     <div class="tb-meta" id="tbMeta" aria-live="polite">loading…</div>
     <div class="tb-spacer"></div>
+    <button class="btn" id="themeToggle" aria-pressed="false" title="Switch to dark theme">Dark</button>
     <button class="btn" id="unitToggle" aria-pressed="false" title="Areas are shown in square metres">Show in ft²</button>
     <button class="btn" id="export" title="Download the current selection as CSV">Export CSV</button>
 

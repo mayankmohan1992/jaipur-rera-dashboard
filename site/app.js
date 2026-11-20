@@ -64,10 +64,33 @@ window.addEventListener('resize', () => {
   _rsz = setTimeout(() => $$('.tbl-wrap').forEach(markScrollable), 120);
 });
 
-if (window.matchMedia) {
-  const mq = window.matchMedia('(prefers-color-scheme: dark)');
-  const redraw = () => { if (typeof render === 'function' && PROJECTS.length) render(); };
-  mq.addEventListener ? mq.addEventListener('change', redraw) : mq.addListener(redraw);
+/* Theme is a reader choice, not an OS preference: light unless they picked dark.
+   Charts read their colours from the CSS tokens, so a switch has to redraw them. */
+const THEME_KEY = 'jr-theme';
+
+function themeName() {
+  return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+}
+
+function applyTheme(mode) {
+  const dark = mode === 'dark';
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  const b = $('#themeToggle');
+  if (b) {
+    b.textContent = dark ? 'Light' : 'Dark';
+    b.setAttribute('aria-pressed', dark ? 'true' : 'false');
+    b.title = dark ? 'Switch to light theme' : 'Switch to dark theme';
+  }
+  try { localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light'); } catch (e) {}
+}
+
+function initTheme() {
+  applyTheme(themeName());
+  const b = $('#themeToggle');
+  if (b) b.onclick = () => {
+    applyTheme(themeName() === 'dark' ? 'light' : 'dark');
+    if (typeof render === 'function' && PROJECTS.length) render();
+  };
 }
 
 function toast(msg) {
@@ -80,6 +103,7 @@ function toast(msg) {
 
 /* -------------------------------------------------------------------- load */
 async function boot() {
+  initTheme();
   const load = async (p) => {
     const r = await fetch('data/' + p);
     if (!r.ok) throw new Error(p + ' ' + r.status);
