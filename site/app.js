@@ -265,6 +265,7 @@ function compact(v) {
   if (a >= 1e7) return (v / 1e7).toFixed(a >= 1e8 ? 0 : 1).replace(/\.0$/, '') + 'Cr';
   if (a >= 1e5) return (v / 1e5).toFixed(a >= 1e6 ? 0 : 1).replace(/\.0$/, '') + 'L';
   if (a >= 1000) return (v / 1000).toFixed(a >= 1e4 ? 0 : 1).replace(/\.0$/, '') + 'k';
+  if (a > 0 && a < 1) return String(+v.toFixed(2));   // 0.5 must not print as 1
   return String(Math.round(v));
 }
 
@@ -323,11 +324,42 @@ function setupCanvas(cv, cssH) {
   return { ctx, w, h, t: theme() };
 }
 
+// shrink a label to the width it has, keeping the start (name) not the tail
+function fitText(ctx, text, maxW) {
+  if (ctx.measureText(text).width <= maxW) return text;
+  const ell = '\u2026';
+  let lo = 0, hi = text.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (ctx.measureText(text.slice(0, mid) + ell).width <= maxW) lo = mid; else hi = mid - 1;
+  }
+  return text.slice(0, lo) + ell;
+}
+
+// A chart with nothing to plot says so. Drawing an axis for an empty series
+// produces ticks like 1, 1, 0 and a row of zeros that looks like a bug.
+function emptyChart(cv, msg, height) {
+  const { ctx, w, h, t } = setupCanvas(cv, height);
+  ctx.fillStyle = t.rule;
+  ctx.fillRect(0, 0, w, 1);
+  ctx.fillStyle = t.muted;
+  ctx.font = '12px "Public Sans", sans-serif';
+  ctx.textAlign = 'left';
+  const maxW = Math.max(80, w - 8);
+  ctx.fillText(fitText(ctx, msg, maxW), 0, Math.max(28, Math.round(h * 0.45)));
+}
+
+function hasValues(values) {
+  return values.some(v => typeof v === 'number' && isFinite(v) && v > 0);
+}
+
 function drawBars(cv, labels, series, opts = {}) {
+  const all = series.flatMap(s => s.values);
+  if (!hasValues(all)) { emptyChart(cv, opts.empty || 'No data for this selection', opts.height || 210); return { max: 0 }; }
   const { ctx, w, h, t } = setupCanvas(cv, opts.height || 210);
   const pad = { l: 52, r: 10, t: 10, b: 34 };
   const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
-  const raw = Math.max(1, ...series.flatMap(s => s.values));
+  const raw = Math.max(...all);
   const step = niceStep(raw / 4);
   const ticks = Math.max(1, Math.ceil(raw / step));
   const max = step * ticks;
@@ -364,11 +396,19 @@ function drawBars(cv, labels, series, opts = {}) {
   return { max };
 }
 
-function drawHBar(cv, labels, values, color = null, height = 240) {
+function drawHBar(cv, labels, values, color = null, height = 240, opts = {}) {
+  if (!hasValues(values)) {
+    emptyChart(cv, opts.empty || 'Nothing to rank for this selection', height);
+    return;
+  }
   const { ctx, w, h, t } = setupCanvas(cv, height);
   const fill = color || t.s2;
-  const pad = { l: 190, r: 60, t: 6, b: 6 };
-  const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
+  ctx.font = '11px "Public Sans", sans-serif';
+  // the gutter is whatever the longest name actually needs, capped so the bars keep room
+  const widest = Math.max(...labels.map(l => ctx.measureText(l || '').width));
+  const gutter = Math.min(Math.max(96, widest + 10), Math.min(w * 0.44, 320));
+  const pad = { l: gutter, r: 58, t: 6, b: 6 };
+  const iw = Math.max(20, w - pad.l - pad.r), ih = h - pad.t - pad.b;
   const max = Math.max(1, ...values);
   const rowH = ih / Math.max(labels.length, 1);
   labels.forEach((lb, i) => {
@@ -377,7 +417,7 @@ function drawHBar(cv, labels, values, color = null, height = 240) {
     ctx.fillStyle = fill;
     ctx.fillRect(pad.l, y + (rowH - bh) / 2, (values[i] / max) * iw, bh);
     ctx.fillStyle = t.muted; ctx.font = '11px "Public Sans", sans-serif'; ctx.textAlign = 'right';
-    ctx.fillText(lb.length > 30 ? lb.slice(0, 29) + '…' : lb, pad.l - 8, y + rowH / 2 + 3);
+    ctx.fillText(fitText(ctx, lb || '', gutter - 10), pad.l - 8, y + rowH / 2 + 3);
     ctx.textAlign = 'left'; ctx.fillStyle = t.ink;
     ctx.fillText(n0(values[i]), pad.l + (values[i] / max) * iw + 6, y + rowH / 2 + 3);
   });
@@ -385,8 +425,10 @@ function drawHBar(cv, labels, values, color = null, height = 240) {
 }
 
 function drawDonut(cv, items, height = 200) {
+  const sum = items.reduce((a, b) => a + b.value, 0);
+  if (!sum) { emptyChart(cv, 'No projects in this selection', height); return; }
   const { ctx, w, h, t } = setupCanvas(cv, height);
-  const total = items.reduce((a, b) => a + b.value, 0) || 1;
+  const total = sum;
   const cx = Math.min(w * 0.33, 130), cy = h / 2, r = Math.min(cy - 10, 78);
   let a0 = -Math.PI / 2;
   items.forEach(it => {
@@ -434,14 +476,22 @@ function renderOverview(rows) {
   });
   const yl = Object.keys(years).sort();
   const pal = PALETTE();
-  drawBars($('#cYear'), yl, [{ values: yl.map(y => years[y].n), color: pal[0] }], { partialLast: true });
-  drawBars($('#cArea'), yl, [{ values: yl.map(y => years[y].saleable), color: pal[1] }]);
-  // saleable area is only filed by a minority of promoters; say so on the card
+  drawBars($('#cYear'), yl, [{ values: yl.map(y => years[y].n), color: pal[0] }],
+    { partialLast: true, empty: 'No projects in this selection have a registration date' });
+  drawBars($('#cArea'), yl, [{ values: yl.map(y => years[y].saleable), color: pal[1] }],
+    { empty: 'No saleable area filed by the projects in this selection' });
+
+  // coverage is a property of the selection, not of the register: say how many of
+  // these projects filed an area at all, otherwise the note contradicts the chart
   const areaCard = $('#cArea').closest('.card');
   if (areaCard) {
-    const pctFiled = (META.coverage && META.coverage.saleable) ? META.coverage.saleable.pct : null;
+    const filed = rows.filter(r => (r.saleable || 0) > 0).length;
     const em = areaCard.querySelector('h3 em');
-    if (em && pctFiled != null) em.textContent = `${areaUnit()} · filed for ${pctFiled}% of projects`;
+    if (em) {
+      em.textContent = filed
+        ? `${areaUnit()} · filed by ${n0(filed)} of ${n0(rows.length)} projects`
+        : `${areaUnit()} · not filed by any of these ${n0(rows.length)} projects`;
+    }
   }
   const shortCat = { 'Mixed (Residential And Commercial)': 'Mixed use' };
   const catPal = theme().cats;
@@ -460,7 +510,8 @@ function renderOverview(rows) {
 
   const topA = Object.values(byProm).sort((a, b) => b.saleable - a.saleable).slice(0, 15);
   drawHBar($('#cPromArea'), topA.map(t => t.name || '(unnamed)'),
-    topA.map(t => Math.round(t.saleable)), pal[1], 260);
+    topA.map(t => Math.round(t.saleable)), pal[1], 260,
+    { empty: 'No saleable area filed — these promoters cannot be ranked by area' });
 
   const teh = {};
   rows.forEach(r => { teh[r.tehsil || '—'] = (teh[r.tehsil || '—'] || 0) + 1; });
