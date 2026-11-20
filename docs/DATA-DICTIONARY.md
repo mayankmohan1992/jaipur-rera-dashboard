@@ -24,8 +24,10 @@ Two payload shapes: the **core record** (one per project, in `data/projects.json
 | `pin` | string | PIN code | `PinCode` |
 | `landArea` | number | land parcel area, m² | `PhaseArea`, else `Area` |
 | `openSpace` | number | aggregate open space, m² | `AggregateAreaOpenSpace` |
-| `saleable` | number | saleable area, m² (blank when not filed) | `SaleableArea` |
-| `builtUp` | number | built-up area on FSI, m² | `BuiltUpAreaFSI` |
+| `area` | number | **the portal's single declared area**, m²: built-up if filed, else saleable | `BuiltUpAreaFSI or SaleableArea` |
+| `areaSrc` | string | which column supplied `area`: `built-up` \| `saleable` \| null | derived |
+| `saleable` | number | saleable-area column, m² (filed by 11%) | `SaleableArea` |
+| `builtUp` | number | built-up area on FSI, m² (filed by 91%) | `BuiltUpAreaFSI` |
 | `buildings` | int | building entries in the form (see METHOD §4) | `GetBuildingDetails` |
 | `buildingsReported` | int | the portal's `TotalBuildingCount` verbatim (plot count on plotted projects) | `TotalBuildingCount` |
 | `bSanctioned` | int | sanctioned buildings, as filed (0 on plotted projects, where the field holds plots) | `SanctionedbuildingCount` |

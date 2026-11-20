@@ -22,11 +22,11 @@ Everything the portal holds in tables, sliced any way you like:
 
 - Total projects, by **category** (Group Housing / Plotted / Commercial / Mixed), **status**,
   **tehsil**, **village**, **year of registration** or any **custom date range**.
-- **Promoter** league tables — project count, saleable area, built-up area, land area, unit count,
+- **Promoter** league tables — project count, declared area, land area, unit count,
   plot count, estimated cost, cases — with drill-through to that promoter's projects.
 - **Group & compare** pivot: pick a dimension (promoter, category, year, tehsil, status, promoter
   type, project size band, village) and a metric, get ranked shares and a totals row. This is the
-  "group housing by promoter" / "saleable area by promoter in FY2026" view.
+  "group housing by promoter" / "declared area by promoter in FY2026" view.
 - **Building configuration** per project: blocks, floors per block, basements, stilts, podiums,
   open and covered parking, sanctioned vs unsanctioned buildings.
 - **Unit inventory**: unit counts, BHK/unit-type mix, carpet-area range and per-type counts,
@@ -120,9 +120,12 @@ This is the part that lies quietly, so it is documented rather than assumed
   size is therefore `max(rows, stated_count)`; summing the stated column inflates some projects 100×.
 - Plotted projects carry the same inventory twice (`PlotDetails` and the allottee list), grouped
   differently. The allottee list wins; `PlotDetails` is only a fallback — otherwise plots double.
-- `SaleableArea` and `BuiltUpAreaFSI` are separate Form-B heads and are frequently not both filed;
-  ~42% of projects have a non-zero saleable area and ~64% a non-zero built-up area. Blanks are
-  shown as blanks.
+- The portal publishes **one** area figure per project, labelled “Total built up area / saleable
+  area (in sq. meters)”. It is filled from `BuiltUpAreaFSI` on building projects (2,193 of 2,419)
+  and from `SaleableArea` on plotted layouts (265); only 40 projects file both, and when both exist
+  they usually carry the same number. The dashboard therefore shows a single **declared area**
+  (`area` = built-up, else saleable) and keeps the two raw columns visible in the project record
+  and the data-quality tab, where their coverage is 90.66% and 10.95% respectively.
 - `TotalBuildingCount` on a plotted project is the plot count, not a building count, so
   "buildings" comes from the building rows when they exist.
 

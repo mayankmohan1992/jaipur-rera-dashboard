@@ -62,8 +62,12 @@ A row is a **plot** if it has a `plotArea`, or its type starts with `PLOT`. Othe
 ## 3. Areas
 
 - `landArea` ← `PhaseArea`, falling back to `Area` (Form-A land parcel).
-- `saleable` ← `SaleableArea`, `builtUp` ← `BuiltUpAreaFSI`. These are separate Form-B heads and
-  are **not** interchangeable: many projects file one and zero the other.
+- `saleable` ← `SaleableArea`, `builtUp` ← `BuiltUpAreaFSI`. **These are not two measurements of
+  different things — they are two columns for the portal's single labelled field**, “Total built up
+  area / saleable area”. Building projects file the first (2,193), plotted layouts the second (265),
+  40 file both. `area` = `builtUp || saleable` is what the portal actually displays, and `areaSrc`
+  records which column supplied it. Summing them separately, or presenting the saleable column as
+  the register's area, is wrong: it reports 11% coverage for a field that is 99.96% populated.
 - `openSpace` ← `AggregateAreaOpenSpace`.
 - Units are **square metres**, the portal's native unit. The UI converts to sq ft at
   ×10.7639 on demand; the JSON payloads stay in m².
@@ -163,5 +167,6 @@ the totals row from that same array — a metric cannot disagree with the table 
 - Row count: master list 2,416 = distinct project ids in the payload.
 - Spot checks against live endpoints: areas, building counts, plot counts for four projects across
   three categories (see commit history).
-- Coverage percentages printed in `meta.json` and surfaced in the UI, so a 42% saleable-area
-  coverage is visible rather than implied.
+- Coverage percentages printed in `meta.json` (two decimals) and surfaced in the UI, so a 99.96%
+  declared-area coverage sitting next to 10.95% saleable-column coverage is visible rather than
+  implied.

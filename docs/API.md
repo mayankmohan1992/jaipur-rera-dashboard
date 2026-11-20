@@ -191,5 +191,10 @@ In the browser, `performance.getEntriesByType('resource')` lists every call a pa
 - **Names are dirty.** `SHREE BALAJI HOMES` vs `M/s Shree Balaji Homes Pvt Ltd`, trailing spaces,
   duplicated partners with two photos. Normalisation (uppercase, strip legal suffixes,
   collapse whitespace) is in `pipeline/build.py::norm`.
+- **The portal conflates built-up and saleable area.** The public project page has one row,
+  “Total built up area / saleable area (in sq. meters)”, whose value is `BuiltUpAreaFSI` for building
+  projects and `SaleableArea` for plotted layouts — verified against MAHAL AANGAN (`BuiltUpAreaFSI`
+  34773.57 shown, `SaleableArea` null) and RESIDENTIAL SCHEME MAANPUR TEELAWALA (`SaleableArea`
+  14175.68, no built-up). Collapse them with `area = BuiltUpAreaFSI or SaleableArea`.
 - **Zero is a value, blank is not.** `SaleableArea: 0.0` means "not filed", not "zero-area
   project". Never sum blanks as zeros without saying so.
