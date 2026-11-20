@@ -248,10 +248,10 @@ function renderKpis(rows) {
   const cases = casesFor(rows).length;
   const filled = (f) => rows.length ? Math.round(100 * rows.filter(r => r[f]).length / rows.length) : 0;
   const k = [
-    ['Projects', n0(rows.length), `${n0(gh)} built · ${n0(plotted)} plotted`, false],
+    ['Projects', n0(rows.length), `${n0(gh)} with units · ${n0(plotted)} plot layouts`, false],
     ['Promoters', n0(new Set(rows.map(r => r.promoterKey).filter(Boolean)).size), 'distinct names', false],
     ['Units', n0(units), `flats &amp; shops · ${filled('units')}% filed`, false],
-    ['Plots', n0(plots), `plotted inventory · ${filled('plotCount')}% filed`, false],
+    ['Plots', n0(plots), `registered plots · ${filled('plotCount')}% filed`, false],
     ['Saleable area', area(sum(rows, r => r.saleable)), `${areaUnit()} · ${filled('saleable')}% filed`, false],
     ['Cases', n0(cases), 'statewide register · builder-level', cases > 0],
   ];
