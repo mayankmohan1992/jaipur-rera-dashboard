@@ -1,0 +1,192 @@
+{
+ "asOf": "2026-11-20T22:10:31",
+ "district": "Jaipur",
+ "districtId": 1077,
+ "source": "rera.rajasthan.gov.in (RERA Rajasthan 2.0)",
+ "totals": {
+  "projects": 2419,
+  "promoters": 1373,
+  "saleable": 5840577,
+  "builtUp": 37094925,
+  "area": 41633015,
+  "land": 45253362,
+  "units": 129571,
+  "plots": 137095,
+  "cost": 964347474722,
+  "buildings": 1869,
+  "cases": 3400,
+  "agents": 10403
+ },
+ "category": {
+  "Plotted Development": 1058,
+  "Group Housing": 1256,
+  "Mixed (Residential And Commercial)": 43,
+  "Commercial": 62
+ },
+ "status": {
+  "COMPLETED": 1027,
+  "COMPLETED & OC ISSUED ": 149,
+  "LAPSED": 404,
+  "INPROGRESS": 752,
+  "SUSPENDED": 11,
+  "REVOKED": 55,
+  "EXEMPTED": 21
+ },
+ "appStatus": {
+  "Application Approved": 2353,
+  "APPLICATION SUSPENDED": 11,
+  "APPLICATION REVOKE": 55
+ },
+ "promoterTypes": {
+  "-": 2419
+ },
+ "tehsils": {
+  "Sanganer": 1137,
+  "Jaipur": 858,
+  "Chaksu": 97,
+  "Madhorajpura": 57,
+  "Amer": 55,
+  "Mauzamabad": 34,
+  "Bassi": 28,
+  "Kotputli": 27,
+  "Kalwar": 25,
+  "Phulera (Hq. Sambhar)": 23,
+  "Phagi": 20,
+  "Rampuradabri": 16,
+  "Jamwa Ramgarh": 9,
+  "Shahpura": 8,
+  "Kalwad": 6,
+  "Chomu": 6,
+  "Kishangarh Renwal": 3,
+  "Dudu": 2,
+  "Jalsu": 2,
+  "Jhotwara": 1,
+  "Mahal": 1,
+  "Paota": 1,
+  "Rajasv Gram Hirapura": 1,
+  "Jobner": 1,
+  "-": 1
+ },
+ "places": {
+  "tehsil": {
+   "before": 40,
+   "after": 25,
+   "merged": 15,
+   "alias_rows": 14
+  },
+  "village": {
+   "before": 1080,
+   "after": 836,
+   "merged": 244,
+   "alias_rows": 0
+  }
+ },
+ "years": {
+  "2017": 280,
+  "2018": 108,
+  "2019": 107,
+  "2020": 112,
+  "2021": 187,
+  "2022": 306,
+  "2023": 308,
+  "2024": 274,
+  "2025": 456,
+  "2026": 281
+ },
+ "coverage": {
+  "area": {
+   "n": 2418,
+   "pct": 99.96
+  },
+  "saleable": {
+   "n": 265,
+   "pct": 10.95
+  },
+  "builtUp": {
+   "n": 2193,
+   "pct": 90.66
+  },
+  "landArea": {
+   "n": 2419,
+   "pct": 100.0
+  },
+  "units": {
+   "n": 980,
+   "pct": 40.51
+  },
+  "plotCount": {
+   "n": 1079,
+   "pct": 44.61
+  },
+  "totalCost": {
+   "n": 2413,
+   "pct": 99.75
+  },
+  "regDate": {
+   "n": 2419,
+   "pct": 100.0
+  },
+  "carpetAvg": {
+   "n": 973,
+   "pct": 40.22
+  },
+  "plotMin": {
+   "n": 1056,
+   "pct": 43.65
+  }
+ },
+ "unitBuckets": {
+  "3BHK": 546,
+  "4BHK": 271,
+  "5BHK+": 34,
+  "2BHK": 297,
+  "Other": 345,
+  "Studio/1RK": 43,
+  "Shop/Showroom": 187,
+  "Plot": 28,
+  "1BHK": 95,
+  "Villa/RowHouse": 40,
+  "Office": 40
+ },
+ "complaints": {
+  "linkage": "builder-level",
+  "note": "The public complaint register names a respondent (promoter/builder) and has a ProjectName column that is empty on every row, so cases are linked to a builder, not to a project. Per-project figures are that builder's cases.",
+  "withProjectName": 0,
+  "statewide": 7909,
+  "matched": 3400,
+  "unmatched": 4509,
+  "byType": {
+   "2": 782,
+   "1": 2617,
+   "3": 1
+  },
+  "byStatus": {
+   "115": 591,
+   "88": 486,
+   "89": 439,
+   "83": 375,
+   "81": 278,
+   "77": 236,
+   "80": 196,
+   "114": 187,
+   "111": 132,
+   "78": 131,
+   "98": 123,
+   "79": 55,
+   "90": 43,
+   "94": 43,
+   "121": 36,
+   "99": 22,
+   "110": 7,
+   "76": 4,
+   "97": 4,
+   "84": 4,
+   "0": 3,
+   "95": 2,
+   "101": 1,
+   "85": 1,
+   "96": 1
+  }
+ },
+ "areaUnit": "sq m (portal native); sq ft = sq m × 10.7639"
+}
