@@ -303,6 +303,16 @@ def build_record(raw):
     two_wheelers = sum(int(num(i.get("NoOfTwoWeelers")) or 0) for i in ca_items)
     visitor_cars = sum(int(num(i.get("NoOfVisitorCarParking")) or 0) for i in ca_items)
 
+    # The portal has ONE declared-area field, labelled "Total built up area /
+    # saleable area": building projects file BuiltUpAreaFSI, plotted layouts file
+    # SaleableArea (only 40 of 2,419 file both). Treating the two API columns as
+    # independent measures made a 100%-covered register look 11% covered, and made
+    # area charts go blank on filters where the other column was the one filed.
+    saleable = num(b.get("SaleableArea"))
+    built_up = num(b.get("BuiltUpAreaFSI"))
+    declared_area = built_up or saleable
+    area_src = "built-up" if built_up else ("saleable" if saleable else None)
+
     gantt = raw.get("gantt") or []
     g_from = sorted(x for x in (dt(g.get("FromDate")) for g in gantt) if x)
     g_to = sorted(x for x in (dt(g.get("ToDate")) for g in gantt) if x)
@@ -324,8 +334,10 @@ def build_record(raw):
         "pin": b.get("PinCode") or "",
         "landArea": num(b.get("PhaseArea")) or num(b.get("Area")),
         "openSpace": num(b.get("AggregateAreaOpenSpace")),
-        "saleable": num(b.get("SaleableArea")),
-        "builtUp": num(b.get("BuiltUpAreaFSI")),
+        "saleable": saleable,
+        "builtUp": built_up,
+        "area": declared_area,          # what the portal shows in its single field
+        "areaSrc": area_src,
         "buildings": len(raw.get("buildings") or []) or (
             0 if is_plotted else int(num(b.get("TotalBuildingCount")) or 0)),
         "buildingsReported": int(num(b.get("TotalBuildingCount")) or 0),
@@ -547,7 +559,8 @@ def timeseries(records):
 
 def coverage(records, field):
     have = [r for r in records if r.get(field)]
-    return {"n": len(have), "pct": round(100 * len(have) / max(len(records), 1), 1)}
+    # two decimals: 2418/2419 is 99.96%, not "100%"
+    return {"n": len(have), "pct": round(100 * len(have) / max(len(records), 1), 2)}
 
 
 # --------------------------------------------------------------------------- #
@@ -609,6 +622,7 @@ def main():
         "promoters": len({r["promoterKey"] for r in records if r["promoterKey"]}),
         "saleable": round(sum(r["saleable"] or 0 for r in records)),
         "builtUp": round(sum(r["builtUp"] or 0 for r in records)),
+        "area": round(sum(r["area"] or 0 for r in records)),
         "land": round(sum(r["landArea"] or 0 for r in records)),
         "units": sum(r["units"] or 0 for r in records),
         "plots": sum(r["plotCount"] or 0 for r in records),
@@ -633,7 +647,7 @@ def main():
         "places": places,
         "years": dict(sorted(Counter(r["regYear"] for r in records if r["regYear"]).items())),
         "coverage": {f: coverage(records, f) for f in
-                     ("saleable", "builtUp", "landArea", "units", "plotCount", "totalCost",
+                     ("area", "saleable", "builtUp", "landArea", "units", "plotCount", "totalCost",
                       "regDate", "carpetAvg", "plotMin")},
         "unitBuckets": dict(Counter(b for r in records for b in (r["unitMix"] or {}))),
         "complaints": {

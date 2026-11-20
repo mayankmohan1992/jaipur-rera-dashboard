@@ -24,7 +24,7 @@ const state = {
   unit: 'sqm',
   sort: { key: 'regDate', dir: -1 },
   pSort: { key: 'projects', dir: -1 },
-  pivot: { row: 'promoter', metric: 'saleable', year: '', cat: '' },
+  pivot: { row: 'promoter', metric: 'area', year: '', cat: '' },
   limit: 300,
 };
 
@@ -173,8 +173,8 @@ function filtered() {
     if (state.prom.size && !state.prom.has(p.promoterKey)) return false;
     if (state.tehsils.size && !state.tehsils.has(p.tehsil)) return false;
     if (!matchPeriod(p)) return false;
-    if (state.minArea != null && (p.saleable == null || p.saleable < state.minArea)) return false;
-    if (state.maxArea != null && (p.saleable == null || p.saleable > state.maxArea)) return false;
+    if (state.minArea != null && (p.area == null || p.area < state.minArea)) return false;
+    if (state.maxArea != null && (p.area == null || p.area > state.maxArea)) return false;
     const u = p.isPlotted ? p.plotCount : p.units;
     if (state.minUnits != null && (u == null || u < state.minUnits)) return false;
     if (state.maxUnits != null && (u == null || u > state.maxUnits)) return false;
@@ -231,7 +231,7 @@ function activeFilterChips() {
   state.prom.forEach(c => add(esc(c), 'prom:' + c));
   if (state.year) add('year: ' + state.year, 'year');
   if (state.dateFrom || state.dateTo) add(`${state.dateFrom || '…'} → ${state.dateTo || '…'}`, 'dates');
-  if (state.minArea != null || state.maxArea != null) add(`saleable ${state.minArea ?? 0}–${state.maxArea ?? '∞'}`, 'area');
+  if (state.minArea != null || state.maxArea != null) add(`area ${state.minArea ?? 0}–${state.maxArea ?? '∞'} m²`, 'area');
   if (state.minUnits != null || state.maxUnits != null) add(`units ${state.minUnits ?? 0}–${state.maxUnits ?? '∞'}`, 'units');
   if (state.casesOnly) add('has cases', 'cases');
   if (state.plotted !== 'any') add(state.plotted, 'plotted');
@@ -252,7 +252,8 @@ function renderKpis(rows) {
     ['Promoters', n0(new Set(rows.map(r => r.promoterKey).filter(Boolean)).size), 'distinct names', false],
     ['Units', n0(units), `flats &amp; shops · ${filled('units')}% filed`, false],
     ['Plots', n0(plots), `registered plots · ${filled('plotCount')}% filed`, false],
-    ['Saleable area', area(sum(rows, r => r.saleable)), `${areaUnit()} · ${filled('saleable')}% filed`, false],
+    ['Declared area', area(sum(rows, r => r.area)),
+      `built-up / saleable ${areaUnit()} · ${n0(rows.filter(r => (r.area || 0) > 0).length)} of ${n0(rows.length)} filed`, false],
     ['Cases', n0(cases), 'statewide register · builder-level', cases > 0],
   ];
   $('#kpis').innerHTML = k.map(([a, b, c, hot]) =>
@@ -467,9 +468,9 @@ function renderOverview(rows) {
   const years = {}, cats = {};
   rows.forEach(r => {
     if (r.regYear) {
-      years[r.regYear] = years[r.regYear] || { n: 0, saleable: 0, units: 0 };
+      years[r.regYear] = years[r.regYear] || { n: 0, area: 0, units: 0 };
       years[r.regYear].n++;
-      years[r.regYear].saleable += r.saleable || 0;
+      years[r.regYear].area += r.area || 0;
       years[r.regYear].units += r.units || 0;
     }
     cats[r.cat] = (cats[r.cat] || 0) + 1;
@@ -478,19 +479,24 @@ function renderOverview(rows) {
   const pal = PALETTE();
   drawBars($('#cYear'), yl, [{ values: yl.map(y => years[y].n), color: pal[0] }],
     { partialLast: true, empty: 'No projects in this selection have a registration date' });
-  drawBars($('#cArea'), yl, [{ values: yl.map(y => years[y].saleable), color: pal[1] }],
-    { empty: 'No saleable area filed by the projects in this selection' });
+  drawBars($('#cArea'), yl, [{ values: yl.map(y => years[y].area), color: pal[1] }],
+    { partialLast: true, empty: 'No built-up / saleable area filed by the projects in this selection' });
 
   // coverage is a property of the selection, not of the register: say how many of
   // these projects filed an area at all, otherwise the note contradicts the chart
   const areaCard = $('#cArea').closest('.card');
   if (areaCard) {
-    const filed = rows.filter(r => (r.saleable || 0) > 0).length;
+    const filed = rows.filter(r => (r.area || 0) > 0).length;
     const em = areaCard.querySelector('h3 em');
     if (em) {
       em.textContent = filed
-        ? `${areaUnit()} · filed by ${n0(filed)} of ${n0(rows.length)} projects`
+        ? `${areaUnit()} · filed by ${n0(filed)} of ${n0(rows.length)} projects · 2026 partial`
         : `${areaUnit()} · not filed by any of these ${n0(rows.length)} projects`;
+    }
+    const promAreaCard = $('#cPromArea') && $('#cPromArea').closest('.card');
+    if (promAreaCard) {
+      const em2 = promAreaCard.querySelector('h3 em');
+      if (em2) em2.textContent = `${areaUnit()} · declared areas only`;
     }
   }
   const shortCat = { 'Mixed (Residential And Commercial)': 'Mixed use' };
@@ -501,17 +507,17 @@ function renderOverview(rows) {
   const byProm = {};
   rows.forEach(r => {
     if (!r.promoterKey) return;
-    byProm[r.promoterKey] = byProm[r.promoterKey] || { n: 0, name: r.promoter, saleable: 0 };
+    byProm[r.promoterKey] = byProm[r.promoterKey] || { n: 0, name: r.promoter, area: 0 };
     byProm[r.promoterKey].n++;
-    byProm[r.promoterKey].saleable += r.saleable || 0;
+    byProm[r.promoterKey].area += r.area || 0;
   });
   const top = Object.values(byProm).sort((a, b) => b.n - a.n).slice(0, 15);
   drawHBar($('#cProm'), top.map(t => t.name || '(unnamed)'), top.map(t => t.n), pal[0], 260);
 
-  const topA = Object.values(byProm).sort((a, b) => b.saleable - a.saleable).slice(0, 15);
+  const topA = Object.values(byProm).sort((a, b) => b.area - a.area).slice(0, 15);
   drawHBar($('#cPromArea'), topA.map(t => t.name || '(unnamed)'),
-    topA.map(t => Math.round(t.saleable)), pal[1], 260,
-    { empty: 'No saleable area filed — these promoters cannot be ranked by area' });
+    topA.map(t => Math.round(t.area)), pal[1], 260,
+    { empty: 'No built up / saleable area filed — these promoters cannot be ranked by area' });
 
   const teh = {};
   rows.forEach(r => { teh[r.tehsil || '—'] = (teh[r.tehsil || '—'] || 0) + 1; });
@@ -523,7 +529,7 @@ function renderOverview(rows) {
 const COLS = [
   ['name', 'Project', 'text'], ['cat', 'Category', 'text'], ['promoter', 'Promoter', 'text'],
   ['status', 'Status', 'text'], ['regDate', 'Registered', 'date'], ['tehsil', 'Tehsil', 'text'],
-  ['landArea', 'Land', 'area'], ['saleable', 'Saleable', 'area'], ['builtUp', 'Built-up', 'area'],
+  ['landArea', 'Land', 'area'], ['area', 'Area', 'area'],
   ['units', 'Units', 'num'], ['plotCount', 'Plots', 'num'], ['buildings', 'Bldgs', 'num'],
   ['totalCost', 'Cost', 'money'], ['casesPromoter', 'Builder cases', 'num'],
 ];
@@ -554,8 +560,7 @@ function renderProjects(rows) {
     <td class="mono">${p.regDate || '–'}</td>
     <td>${esc(p.tehsil)}</td>
     <td class="r">${area(p.landArea)}</td>
-    <td class="r">${area(p.saleable)}</td>
-    <td class="r">${area(p.builtUp)}</td>
+    <td class="r" title="${p.areaSrc ? 'as filed: ' + p.areaSrc : 'not filed'}">${area(p.area)}</td>
     <td class="r">${n0(p.units)}</td>
     <td class="r">${n0(p.plotCount)}</td>
     <td class="r">${n0(p.buildings)}</td>
@@ -594,8 +599,8 @@ function renderPromoters(rows) {
   rows.forEach(r => {
     const k = r.promoterKey || '(UNNAMED)';
     let x = agg.get(k);
-    if (!x) { x = { key: k, name: r.promoter || k, n: 0, saleable: 0, builtUp: 0, land: 0, units: 0, plots: 0, cost: 0, cases: 0, cats: {}, first: null, last: null, ids: [] }; agg.set(k, x); }
-    x.n++; x.saleable += r.saleable || 0; x.builtUp += r.builtUp || 0; x.land += r.landArea || 0;
+    if (!x) { x = { key: k, name: r.promoter || k, n: 0, area: 0, land: 0, units: 0, plots: 0, cost: 0, cases: 0, cats: {}, first: null, last: null, ids: [] }; agg.set(k, x); }
+    x.n++; x.area += r.area || 0; x.land += r.landArea || 0;
     x.units += r.units || 0; x.plots += r.plotCount || 0; x.cost += r.totalCost || 0;
     x.cases += r.casesProject + r.casesPromoter;
     x.cats[r.cat] = (x.cats[r.cat] || 0) + 1;
@@ -609,8 +614,8 @@ function renderPromoters(rows) {
     if (typeof x === 'string') return s.dir * String(x).localeCompare(String(y));
     return s.dir * ((x || 0) - (y || 0));
   });
-  const cols = [['name', 'Promoter', ''], ['n', 'Projects', 'r'], ['saleable', 'Saleable', 'r'],
-    ['builtUp', 'Built-up', 'r'], ['land', 'Land', 'r'], ['units', 'Units', 'r'],
+  const cols = [['name', 'Promoter', ''], ['n', 'Projects', 'r'], ['area', 'Area', 'r'],
+    ['land', 'Land', 'r'], ['units', 'Units', 'r'],
     ['plots', 'Plots', 'r'], ['cost', 'Cost', 'r'], ['cases', 'Cases', 'r'],
     ['first', 'First reg', ''], ['last', 'Last reg', '']];
   const head = cols.map(([k, l, c]) => `<th scope="col" class="${c}" data-psort="${k}"` +
@@ -619,8 +624,7 @@ function renderPromoters(rows) {
   const body = list.map(x => `<tr class="click" data-prom="${esc(x.key)}">
     <td class="wrap" style="max-width:340px;overflow:hidden;text-overflow:ellipsis" title="${esc(x.name)}">${esc(x.name)}</td>
     <td class="r">${n0(x.n)}</td>
-    <td class="r">${area(x.saleable)}</td>
-    <td class="r">${area(x.builtUp)}</td>
+    <td class="r">${area(x.area)}</td>
     <td class="r">${area(x.land)}</td>
     <td class="r">${n0(x.units)}</td>
     <td class="r">${n0(x.plots)}</td>
@@ -651,14 +655,15 @@ const PIVOT_ROWS = [
   ['sizeBand', 'Project size band'], ['village', 'Village'],
 ];
 const PIVOT_METRICS = [
-  ['saleable', 'Saleable area'], ['builtUp', 'Built-up area'], ['landArea', 'Land area'],
+  ['area', 'Built up / saleable area'], ['saleable', 'Saleable area (own column)'],
+  ['builtUp', 'Built-up area (own column)'], ['landArea', 'Land area'],
   ['units', 'Units'], ['plotCount', 'Plots'], ['totalCost', 'Estimated cost'],
   ['casesProject', 'Cases'], ['count', 'Project count'], ['buildings', 'Buildings'],
   ['openSpace', 'Open space'],
 ];
 
 function sizeBand(p) {
-  const a = p.saleable || p.builtUp || 0;
+  const a = p.area || 0;
   const q = state.unit === 'sqft' ? a * SQM2SQF : a;
   if (!q) return 'n/a';
   if (q < 1000) return '<1k';
@@ -670,15 +675,14 @@ function sizeBand(p) {
 
 function renderPivot(rows) {
   const { row, metric } = state.pivot;
-  const fmt = metric === 'totalCost' ? money : (['saleable', 'builtUp', 'landArea', 'openSpace'].includes(metric) ? (v) => area(v) : n0);
+  const fmt = metric === 'totalCost' ? money : (['area', 'saleable', 'builtUp', 'landArea', 'openSpace'].includes(metric) ? (v) => area(v) : n0);
   const g = new Map();
   rows.forEach(r => {
     const k = row === 'sizeBand' ? sizeBand(r) : (r[row] || '—');
     let x = g.get(k);
-    if (!x) { x = { key: k, n: 0, saleable: 0, builtUp: 0, landArea: 0, units: 0, plotCount: 0, totalCost: 0, casesProject: 0, buildings: 0, openSpace: 0, ids: [] }; g.set(k, x); }
+    if (!x) { x = { key: k, n: 0, area: 0, landArea: 0, units: 0, plotCount: 0, totalCost: 0, casesProject: 0, buildings: 0, openSpace: 0, ids: [] }; g.set(k, x); }
     x.n++;
-    x.saleable += r.saleable || 0;
-    x.builtUp += r.builtUp || 0;
+    x.area += r.area || 0;
     x.landArea += r.landArea || 0;
     x.units += r.units || 0;
     x.plotCount += r.plotCount || 0;
@@ -697,8 +701,7 @@ function renderPivot(rows) {
     <td class="r dim">${(100 * x.n / Math.max(total, 1)).toFixed(1)}%</td>
     <td class="r"><b>${fmt(x[metric] || 0)}</b></td>
     <td class="r dim">${sumMetric ? (100 * (x[metric] || 0) / sumMetric).toFixed(1) : '0.0'}%</td>
-    <td class="r">${area(x.saleable)}</td>
-    <td class="r">${area(x.builtUp)}</td>
+    <td class="r">${area(x.area)}</td>
     <td class="r">${n0(x.units)}</td>
     <td class="r">${n0(x.plotCount)}</td>
     <td class="r">${money(x.totalCost)}</td>
@@ -710,15 +713,14 @@ function renderPivot(rows) {
       <th class="r">Projects</th><th class="r">% of count</th>
       <th class="r">${esc((PIVOT_METRICS.find(x => x[0] === metric) || [, 'Metric'])[1])}</th>
       <th class="r">% share</th>
-      <th class="r">Saleable</th><th class="r">Built-up</th><th class="r">Units</th>
+      <th class="r">Area</th><th class="r">Units</th>
       <th class="r">Plots</th><th class="r">Cost</th><th class="r">Cases</th>
     </tr></thead>
     <tbody>${body}</tbody>
     <tfoot><tr>
       <td><b>Total</b></td><td class="r"><b>${n0(total)}</b></td><td></td>
       <td class="r"><b>${fmt(sumMetric)}</b></td><td></td>
-      <td class="r">${area(sum(rows, r => r.saleable))}</td>
-      <td class="r">${area(sum(rows, r => r.builtUp))}</td>
+      <td class="r">${area(sum(rows, r => r.area))}</td>
       <td class="r">${n0(sum(rows, r => r.units))}</td>
       <td class="r">${n0(sum(rows, r => r.plotCount))}</td>
       <td class="r">${money(sum(rows, r => r.totalCost))}</td>
@@ -779,7 +781,9 @@ async function renderAgents() {
 function renderQuality() {
   const cov = META.coverage;
   const rows = [
-    ['Saleable area', cov.saleable], ['Built-up area (FSI)', cov.builtUp],
+    ['Built up / saleable (portal field)', cov.area],
+    ['Saleable area, own column', cov.saleable],
+    ['Built-up area (FSI), own column', cov.builtUp],
     ['Land / plot area', cov.landArea], ['Unit inventory', cov.units],
     ['Plot inventory', cov.plotCount], ['Estimated cost', cov.totalCost],
     ['Registration date', cov.regDate], ['Carpet area', cov.carpetAvg], ['Plot sizes', cov.plotMin],
@@ -824,9 +828,16 @@ async function openDetail(id) {
     ['Promoter type', p.promoterType], ['Org type', det && det.promoterOrgType],
     ['Promoter projects (portal)', det && det.promoterProjects ? det.promoterProjects.length : null],
   ].filter(x => x[1]);
+  // One declared figure, with the source named on its own label. The raw columns are
+  // only shown when they add information — i.e. when both were filed and disagree.
   const areaRows = [
-    ['Land / plot area', p.landArea], ['Open space', p.openSpace], ['Saleable area', p.saleable],
-    ['Built-up area (FSI)', p.builtUp], ['Not-approved built-up', det && det.notApprovedBuiltUp],
+    ['Land / plot area', p.landArea], ['Open space', p.openSpace],
+    [p.areaSrc === 'built-up' ? 'Declared area (filed as built-up)'
+      : p.areaSrc === 'saleable' ? 'Declared area (filed as saleable)'
+        : 'Declared area', p.area],
+    ...(p.builtUp && p.area && p.builtUp !== p.area ? [['also filed: built-up (FSI)', p.builtUp]] : []),
+    ...(p.saleable && p.area && p.saleable !== p.area ? [['also filed: saleable', p.saleable]] : []),
+    ['Not-approved built-up', det && det.notApprovedBuiltUp],
   ];
   const bRows = [
     ['Building entries (form)', p.buildings], ['Sanctioned (portal)', p.bSanctioned], ['Not sanctioned (portal)', p.bUnsanctioned],
@@ -916,7 +927,7 @@ function closeDetail() {
 function exportCsv() {
   const rows = filtered();
   const cols = ['id', 'name', 'cat', 'status', 'app', 'regNo', 'regDate', 'promoter', 'promoterType',
-    'tehsil', 'village', 'pin', 'landArea', 'openSpace', 'saleable', 'builtUp', 'buildings',
+    'tehsil', 'village', 'pin', 'landArea', 'openSpace', 'area', 'areaSrc', 'saleable', 'builtUp', 'buildings',
     'bSanctioned', 'bUnsanctioned', 'blocks', 'units', 'plotCount', 'carpetMin', 'carpetMax',
     'plotMin', 'plotMax', 'landCost', 'totalCost', 'casesProject', 'casesPromoter', 'docs'];
   const head = cols.join(',') + ',unitMix';
@@ -1035,7 +1046,7 @@ function wire() {
     const list = PROMOTERS.filter(p => (p.name || '').toUpperCase().includes(q) || (p.key || '').includes(q)).slice(0, 30);
     $('#promList').innerHTML = list.map(p =>
       `<div class="chip" data-promadd="${esc(p.key)}" style="display:block;margin:3px 0">
-        ${esc(p.name)} <small>${n0(p.projects)} projects · ${n0(p.saleable)} m²</small></div>`).join('')
+        ${esc(p.name)} <small>${n0(p.projects)} projects · ${n0(p.area)} m²</small></div>`).join('')
       || '<div class="dim mini" style="padding:6px">no match</div>';
   });
   $('#promList').onclick = (e) => {

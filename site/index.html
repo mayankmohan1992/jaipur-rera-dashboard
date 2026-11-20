@@ -81,10 +81,10 @@
     <input type="date" id="dateTo">
   </div>
   <div class="f">
-    <label for="minArea">Saleable area (m²)</label>
+    <label for="minArea">Area (m²)</label>
     <div class="pair">
-      <input class="num" id="minArea" type="number" inputmode="numeric" placeholder="min" aria-label="Minimum saleable area">
-      <input class="num" id="maxArea" type="number" inputmode="numeric" placeholder="max" aria-label="Maximum saleable area">
+      <input class="num" id="minArea" type="number" inputmode="numeric" placeholder="min" aria-label="Minimum area">
+      <input class="num" id="maxArea" type="number" inputmode="numeric" placeholder="max" aria-label="Maximum area">
     </div>
   </div>
   <div class="f">
@@ -126,16 +126,16 @@
         <div class="chart-box"><canvas id="cCat" role="img" aria-label="Category mix of projects"></canvas></div></div>
     </div>
     <div class="grid2 even">
-      <div class="card"><h3>Saleable area registered per year <em>m²</em></h3>
-        <div class="chart-box"><canvas id="cArea" role="img" aria-label="Saleable area registered per year"></canvas></div></div>
+      <div class="card"><h3>Declared area by registration year <em>m²</em></h3>
+        <div class="chart-box"><canvas id="cArea" role="img" aria-label="Declared area by registration year"></canvas></div></div>
       <div class="card"><h3>Tehsils <em>project count</em></h3>
         <div class="chart-box"><canvas id="cTehsil" role="img" aria-label="Projects per tehsil"></canvas></div></div>
     </div>
     <div class="grid2 even">
       <div class="card"><h3>Top promoters by project count</h3>
         <div class="chart-box"><canvas id="cProm" role="img" aria-label="Promoters ranked by project count"></canvas></div></div>
-      <div class="card"><h3>Top promoters by saleable area <em>m²</em></h3>
-        <div class="chart-box"><canvas id="cPromArea" role="img" aria-label="Promoters ranked by saleable area"></canvas></div></div>
+      <div class="card"><h3>Top promoters by declared area <em>m²</em></h3>
+        <div class="chart-box"><canvas id="cPromArea" role="img" aria-label="Promoters ranked by declared area"></canvas></div></div>
     </div>
   </section>
 
@@ -171,7 +171,8 @@
       <div class="f">
         <label for="pMetric">Rank by</label>
         <select id="pMetric">
-          <option value="saleable">Saleable area</option>
+          <option value="area">Area (built up / saleable)</option>
+          <option value="saleable">Saleable area (own column)</option>
           <option value="builtUp">Built-up area</option>
           <option value="landArea">Land area</option>
           <option value="units">Units</option>
@@ -216,9 +217,12 @@
       </p>
       <p class="mini dim" style="margin:0;max-width:78ch">
         Areas are square metres, the portal's native unit; switch to square feet in the header.
-        A blank area means the promoter filed zero or left the field empty — a gap on the portal, not a
-        zero-area project. “Built-up (FSI)” and “saleable” are separate Form-B heads and often differ,
-        or one of them is zero.
+        The portal publishes <b>one</b> area figure per project, labelled “Total built up area /
+        saleable area”: building projects file <i>built-up (FSI)</i>, plotted layouts file
+        <i>saleable</i>, and only 40 of 2,419 projects file both. This register shows that one declared
+        figure, and keeps the two underlying columns apart in the project record and the data-quality
+        tab. A blank area means the promoter filed neither — a gap on the portal, not a zero-area
+        project.
       </p>
     </div>
   </section>
