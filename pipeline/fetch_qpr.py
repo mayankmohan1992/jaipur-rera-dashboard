@@ -55,9 +55,12 @@ _lock = threading.Lock()
 _done = _err = 0
 
 
-def _get(url, tries=3):
+def _get(url, tries=4):
     for i in range(tries):
         try:
+            # the portal resets bursts: a small jitter between calls keeps ~1.2 s/call
+            # with no errors, where 6-8 parallel workers fail on most requests
+            time.sleep(random.uniform(0.05, 0.25))
             req = urllib.request.Request(url, headers=HEADERS)
             with urllib.request.urlopen(req, timeout=90) as f:
                 return json.loads(f.read().decode("utf-8", "replace"))
@@ -175,7 +178,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--all", action="store_true", help="every filed quarter, not just the latest")
     ap.add_argument("--limit", type=int, default=0)
-    ap.add_argument("--workers", type=int, default=8)
+    ap.add_argument("--workers", type=int, default=3)
     a = ap.parse_args()
 
     os.makedirs(OUT, exist_ok=True)
