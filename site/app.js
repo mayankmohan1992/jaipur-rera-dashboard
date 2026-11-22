@@ -102,6 +102,16 @@ function toast(msg) {
 }
 
 /* -------------------------------------------------------------------- load */
+async function stalenessNotice() {
+  const asOf = META && META.asOf ? new Date(META.asOf) : null;
+  if (!asOf || isNaN(asOf)) return '';
+  const days = Math.floor((Date.now() - asOf.getTime()) / 86400000);
+  if (days < 3) return '';
+  return `<div class="stale" role="status">This register has not been refreshed for ${days} days —
+    the portal was unreachable from the last machine that tried. Figures below are from
+    ${asOf.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}.</div>`;
+}
+
 async function boot() {
   initTheme();
   const load = async (p) => {
@@ -132,7 +142,7 @@ function renderHeader() {
     timeZone: 'Asia/Kolkata',
   }) + ' IST';
   $('#tbMeta').innerHTML = `Register as of <b>${esc(stamp)}</b><br>` +
-    `Source: RERA Rajasthan public API · district 1077`;
+    `Source: RERA Rajasthan public API · district 1077` + stalenessNotice();
 }
 
 /* ----------------------------------------------------------------- filters */
@@ -205,6 +215,12 @@ function render() {
   });
   $$('.view').forEach(v => v.classList.toggle('on', v.id === 'view-' + state.tab));
   const rows = filtered();
+  const stale = $('#staleBar');
+  if (stale) {
+    const note = stalenessNotice();
+    stale.innerHTML = note ? note.replace('class="stale"', 'class="stale bar"') : '';
+    stale.style.display = note ? '' : 'none';
+  }
   renderKpis(rows);
   if (state.tab === 'overview') renderOverview(rows);
   if (state.tab === 'projects') renderProjects(rows);

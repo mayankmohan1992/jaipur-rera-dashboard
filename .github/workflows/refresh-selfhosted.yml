@@ -1,0 +1,75 @@
+name: refresh (self-hosted)
+
+# The only way a scheduled refresh can work: GitHub-hosted runners are blocked at the
+# packet level by the portal. Measured 22 Nov 2026 from westus2 (Azure, 4.242.53.74):
+# all three hosts — rera, reraapi and reraapp — resolve, then never accept a TCP
+# connection (curl exit 28 after 20 s, connect=0.000s). Nothing in this repo can fix
+# that; the crawl needs an egress the portal accepts.
+#
+# So this workflow runs on a runner you own: any always-on machine with ordinary
+# internet (a small VPS, a Raspberry Pi, a NAS, an old laptop). Set it up once with
+# docs/RUNNER.md, register it with the label `rera`, and this job takes over the
+# daily refresh entirely — your laptop can be off for a month.
+#
+# The crawl is resumable (raw/ and raw_qpr/ are caches on the runner's workspace), so
+# an interrupted run costs only the projects it had not reached.
+
+on:
+  schedule:
+    - cron: '30 0 * * *'        # 06:00 IST
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: why this manual refresh
+        required: false
+
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: [self-hosted, linux, rera]
+    timeout-minutes: 300
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Toolchain
+        run: |
+          python3 --version
+          git --version
+
+      - name: Let the publish step push with this job's token
+        run: |
+          git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          git config --global user.name  "rera-refresh-bot"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Crawl, enrich, build, verify, publish
+        run: ./scripts/refresh.sh
+
+      - name: Ledger
+        if: always()
+        run: |
+          {
+            echo "### Jaipur RERA refresh (self-hosted)"
+            echo ""
+            if [ -f site/data/meta.json ]; then
+              python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          m = json.load(open('site/data/meta.json'))
+          t = m['totals']
+          print(f"- as of: {m['asOf']}")
+          print(f"- projects: {t['projects']} · booked {t.get('sold')} · unsold {t.get('unsold')}")
+          print(f"- QPR: {m['coverage']['qprQ']['n']} projects with a filing")
+          PY
+            else
+              echo "no payload produced — the crawl did not finish"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

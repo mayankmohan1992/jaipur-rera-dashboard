@@ -712,3 +712,18 @@ footer {
   body { background: #fff; color: #000; }
   main { padding: 0; }
 }
+
+/* stale-data notice: silence about a frozen register is the real defect */
+.stale {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--bad);
+}
+.stale.bar {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-left: 2px solid var(--bad);
+  background: color-mix(in srgb, var(--bad) 7%, transparent);
+  max-width: 92ch;
+}
