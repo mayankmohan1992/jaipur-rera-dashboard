@@ -119,15 +119,27 @@ def work(args):
     path, all_quarters = args
     pid = os.path.basename(path).split(".")[0]
     out_path = os.path.join(OUT, f"{pid}.json.gz")
-    if os.path.exists(out_path):
-        with _lock:
-            globals()["_done"] += 1
-            if _done % 200 == 0:
-                print(f"  [{_done}/{_total}] skipped existing", flush=True)
-        return
     try:
         d = json.load(gzip.open(path, "rt"))
         rows = ((d.get("dtls") or {}).get("qpr") or [])
+        # skip only when the cache already holds everything this run would fetch -
+        # otherwise a --all pass would silently reuse a latest-only file
+        want = len(rows) if all_quarters else 1
+        if os.path.exists(out_path) and rows:
+            try:
+                have = len(json.load(gzip.open(out_path, "rt")).get("rows") or [])
+            except Exception:                                   # noqa: BLE001
+                have = 0
+            if have >= want:
+                with _lock:
+                    globals()["_done"] += 1
+                    if _done % 200 == 0:
+                        print(f"  [{_done}/{_total}] cache complete", flush=True)
+                return
+        elif os.path.exists(out_path) and not rows:
+            with _lock:
+                globals()["_done"] += 1
+            return
         if not rows:
             payload = {"projectId": int(pid), "rows": [], "note": "no QPR filed"}
         else:

@@ -544,16 +544,64 @@ function staleness(n) {
   return `<span class="pill bad">${n} quarters behind</span>`;
 }
 
+function ageBuckets(rows) {
+  const b = { 'current': 0, '1': 0, '2-3': 0, '4-7': 0, '8+': 0, 'never': 0 };
+  rows.forEach(r => {
+    if (!r.qprQ) { b.never++; return; }
+    const n = quartersSince(r.qprQ) || 0;
+    if (n <= 0) b.current++;
+    else if (n === 1) b['1']++;
+    else if (n <= 3) b['2-3']++;
+    else if (n <= 7) b['4-7']++;
+    else b['8+']++;
+  });
+  return b;
+}
+
 function renderQpr(rows) {
   const filed = rows.filter(r => r.qprQ);
   const never = rows.length - filed.length;
   const overdue = filed.filter(r => (quartersSince(r.qprQ) || 0) >= 2).length;
+
+  // funnel: proposed (Form-A) -> sanctioned (QPR) -> booked / unsold (QPR)
+  const proposed = rows.reduce((a, r) => a + (r.units || 0) + (r.plotCount || 0), 0);
+  const sanctioned = rows.reduce((a, r) => a + (r.sanctioned || 0), 0);
+  const booked = rows.reduce((a, r) => a + (r.sold || 0), 0);
+  const unsoldQ = rows.reduce((a, r) => a + (r.unsold || 0), 0);
+  const pal = PALETTE();
+  drawHBar($('#cFunnel'), ['Proposed at registration', 'Sanctioned (QPR)', 'Booked (QPR)', 'Unsold (QPR)'],
+    [proposed, sanctioned, booked, unsoldQ], pal[0], 170, {});
+  if ($('#funnelNote')) {
+    $('#funnelNote').textContent =
+      `${n0(booked)} of ${n0(booked + unsoldQ)} filed inventory is booked` +
+      (booked + unsoldQ ? ` (${Math.round(100 * booked / (booked + unsoldQ))}%)` : '') +
+      ` · ${n0(filed.length)} of ${n0(rows.length)} projects report inventory`;
+  }
+
+  const buckets = ageBuckets(rows);
+  const labels = ['current', '1', '2-3', '4-7', '8+', 'never'];
+  drawBars($('#cQprAge'), labels,
+    [{ values: labels.map(k => buckets[k]), color: pal[1] }],
+    { empty: 'No projects in this selection', height: 170 });
+  if ($('#qprAgeNote')) {
+    $('#qprAgeNote').textContent =
+      `quarters since the quarter reported · ${n0(buckets.current)} current, ` +
+      `${n0(buckets['2-3'] + buckets['4-7'] + buckets['8+'])} two or more behind, ${n0(buckets.never)} never filed`;
+  }
   $('#qprCount').innerHTML = `${n0(rows.length)} projects · <b>${n0(filed.length)}</b> have filed a QPR ` +
     `(${n0(overdue)} of those are two or more quarters behind) · <b>${n0(never)}</b> never filed · ` +
-    `showing ${n0(Math.min(rows.length, 400))}`;
+    `showing ${n0(Math.min(scoped.length, 400))} of ${n0(scoped.length)} in this scope`;
 
+  const scope = ($('#qprScope') && $('#qprScope').value) || 'all';
+  const scoped = rows.filter(r => {
+    const n = quartersSince(r.qprQ);
+    if (scope === 'never') return !r.qprQ;
+    if (scope === 'current') return r.qprQ && (n || 0) === 0;
+    if (scope === 'overdue') return r.qprQ && (n || 0) >= 2;
+    return true;
+  });
   const sort = ($('#qprSort') && $('#qprSort').value) || 'recent';
-  const list = rows.slice().sort((a, b) => {
+  const list = scoped.slice().sort((a, b) => {
     if (sort === 'recent') return String(b.qprFiled || '').localeCompare(String(a.qprFiled || ''));
     if (sort === 'sold') return (b.sold || -1) - (a.sold || -1);
     if (sort === 'pct') return (b.pctSold || -1) - (a.pctSold || -1);
@@ -854,10 +902,19 @@ function renderQuality() {
     ['Land / plot area', cov.landArea], ['Unit inventory', cov.units],
     ['Plot inventory', cov.plotCount], ['Estimated cost', cov.totalCost],
     ['Registration date', cov.regDate], ['Carpet area', cov.carpetAvg], ['Plot sizes', cov.plotMin],
+    ['QPR filed (latest filing)', cov.qprQ], ['QPR booked count', cov.sold],
   ];
   $('#covTable').innerHTML = `<table><thead><tr><th>Field</th><th class="r">Projects with a value</th><th class="r">Coverage</th></tr></thead>
     <tbody>${rows.map(([l, c]) => `<tr><td>${l}</td><td class="r">${n0(c.n)}</td>
       <td class="r ${c.pct < 50 ? 'dim' : ''}">${c.pct}%</td></tr>`).join('')}</tbody></table>`;
+  const excl = $('#covExcluded');
+  if (excl) {
+    excl.innerHTML = `<p class="mini dim" style="margin:10px 0 0;max-width:64ch">Excluded as unreliable:
+      the Form-B inventory rows carry a Sold / Unsold status, but their <code>count</code> column repeats a
+      type's total on every row (one project summed to 267,802 units in a district of 129,571) and unsold
+      comes back 0 almost everywhere. Booked and unsold figures therefore come only from the promoter's
+      QPR, and units and plots are counted together because that is how the QPR reports them.</p>`;
+  }
   const cs = META.complaints;
   $('#caseQuality').innerHTML = `<table><thead><tr><th>Complaint register</th><th class="r">Rows</th></tr></thead><tbody>
     <tr><td>Statewide complaints scraped</td><td class="r">${n0(cs.statewide)}</td></tr>
@@ -951,8 +1008,12 @@ async function openDetail(id) {
     </div>
     ${plInv.length ? `<div class="kv" style="margin-top:8px">
       <div><span>Plot sizes</span><span>${area(p.plotMin, 1)} – ${area(p.plotMax, 1)} ${areaUnit()}</span></div>
-      <div><span>Sold / unsold</span><span>${
-        (p.sold || p.unsold) ? `${n0(p.sold)} / ${n0(p.unsold)}` : 'Not filed'}</span></div></div>` : ''}
+      <div><span>Booked / unsold (QPR)</span><span>${
+        (p.sold != null || p.unsold != null)
+          ? `${n0(p.sold)} / ${n0(p.unsold)}${p.pctSold != null ? ` · ${p.pctSold}%` : ''}`
+          : 'Not filed'}</span></div>
+      <div><span>Funnel</span><span>${n0((p.units || 0) + (p.plotCount || 0))} proposed · ${
+        p.sanctioned != null ? n0(p.sanctioned) : '–'} sanctioned</span></div></div>` : ''}
 
     <h4>QPR / APR filings</h4>
     ${(() => {
@@ -961,14 +1022,14 @@ async function openDetail(id) {
         return `<p class="mini dim" style="margin:0 0 4px">No quarterly progress report filed for this
           project.${p.aprYear ? ` Last annual report: FY ${esc(p.aprYear)}.` : ''}</p>`;
       }
-      const rows = hist.slice(0, 8).map(x => `<tr>
+      const rows = hist.map(x => `<tr>
         <td>${esc(x.quarter || '–')}</td>
         <td class="mono">${x.filedOn || '–'}</td>
         <td class="r">${x.booked == null ? '–' : n0(x.booked)}</td>
         <td class="r">${x.unbooked == null ? '–' : n0(x.unbooked)}</td>
         <td class="r">${x.pctBooked == null ? '–' : x.pctBooked + '%'}</td>
         <td class="r">${x.constPct == null ? '–' : x.constPct + '%'}</td></tr>`).join('');
-      return `<p class="mini dim" style="margin:0 0 6px">${n0(hist.length)} quarterly filing${hist.length === 1 ? '' : 's'}
+      return `<p class="mini dim" style="margin:0 0 6px">${n0(p.qprFilings || hist.length)} quarterly filing${(p.qprFilings || hist.length) === 1 ? '' : 's'} on file
         · latest ${esc(p.qprQuarter || '')}${p.qprFiled ? ' filed ' + p.qprFiled : ''}
         ${p.aprYear ? '· last annual report FY ' + esc(p.aprYear) : '· no annual report'}
         ${p.sanctioned != null ? '· ' + n0(p.sanctioned) + ' sanctioned' : ''}</p>
@@ -1072,6 +1133,7 @@ function wire() {
     c.classList.toggle('on'); c.setAttribute('aria-pressed', String(c.classList.contains('on'))); render();
   };
   if ($('#qprSort')) $('#qprSort').onchange = () => render();
+  if ($('#qprScope')) $('#qprScope').onchange = () => render();
 
   $('#fStatus').onclick = (e) => {
     const c = e.target.closest('[data-status]'); if (!c) return;

@@ -385,9 +385,6 @@ def build_record(raw):
         "carpetAvg": round(statistics.fmean(carpets), 1) if carpets else None,
         "plotMin": round(min(a for a, _ in plot_areas), 1) if plot_areas else None,
         "plotMax": round(max(a for a, _ in plot_areas), 1) if plot_areas else None,
-        # Form-B unit-row status (kept for transparency; the row counts inflate badly)
-        "soldUnitRows": sold,
-        "unsoldUnitRows": unsold,
         # QPR is the authority's own per-quarter inventory figure - use it for "sold"
         "sold": (qpr[0].get("booked") if qpr else None),
         "unsold": (qpr[0].get("unbooked") if qpr else None),

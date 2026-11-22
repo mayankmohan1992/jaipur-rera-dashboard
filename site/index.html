@@ -198,11 +198,27 @@
   </section>
 
   <section class="view" id="view-qpr">
+    <div class="grid2 even" style="margin:0 0 14px">
+      <div class="card"><h3>Sales funnel <em>this selection</em></h3>
+        <div class="chart-box"><canvas id="cFunnel" role="img"
+          aria-label="Proposed, sanctioned and booked inventory for the selected projects"></canvas></div>
+        <p class="mini dim" id="funnelNote" style="margin:8px 0 0"></p></div>
+      <div class="card"><h3>Filings by quarter <em>latest QPR</em></h3>
+        <div class="chart-box"><canvas id="cQprAge" role="img"
+          aria-label="Projects by how many quarters behind their latest QPR filing"></canvas></div>
+        <p class="mini dim" id="qprAgeNote" style="margin:8px 0 0"></p></div>
+    </div>
     <div class="tb-row" style="gap:10px;align-items:end;margin:0 0 10px">
       <p class="count" id="qprCount" aria-live="polite" style="margin:0"></p>
       <div class="tb-spacer"></div>
       <label class="mini dim" for="qprSort" style="display:flex;gap:6px;align-items:center">
         sort
+        <select id="qprScope" class="btn" style="padding:5px 8px">
+          <option value="all">all projects</option>
+          <option value="overdue">two or more quarters behind</option>
+          <option value="never">never filed</option>
+          <option value="current">filed this quarter</option>
+        </select>
         <select id="qprSort" class="btn" style="padding:5px 8px">
           <option value="recent">most recent filing</option>
           <option value="stale">most overdue first</option>
@@ -227,7 +243,7 @@
 
   <section class="view" id="view-quality">
     <div class="grid2 even">
-      <div class="card"><h3>Field coverage <em>all Jaipur projects</em></h3><div id="covTable"></div></div>
+      <div class="card"><h3>Field coverage <em>all Jaipur projects</em></h3><div id="covTable"></div><div id="covExcluded"></div></div>
       <div class="card"><h3>Complaint register <em>statewide</em></h3><div id="caseQuality"></div></div>
     </div>
     <div class="card">
