@@ -22,6 +22,10 @@ Everything the portal holds in tables, sliced any way you like:
 
 - Total projects, by **category** (Group Housing / Plotted / Commercial / Mixed), **status**,
   **tehsil**, **village**, **year of registration** or any **custom date range**.
+- **QPR / APR** tab — every project's latest quarterly progress filing: quarter reported, date
+  filed, booked / unsold units, % booked, construction progress, and last annual report year,
+  sortable by recency or by how many quarters behind. Sold / Unsold also appear as columns on
+  Projects and as a filing history in the project modal.
 - **Promoter** league tables — project count, declared area, land area, unit count,
   plot count, estimated cost, cases — with drill-through to that promoter's projects.
 - **Group & compare** pivot: pick a dimension (promoter, category, year, tehsil, status, promoter

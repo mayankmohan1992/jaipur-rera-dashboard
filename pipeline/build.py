@@ -181,6 +181,35 @@ def unit_bucket(name):
     return "Other"
 
 
+QPR_RAW = os.path.join(ROOT, "raw_qpr")
+_QF = {"january to march": 1, "april to june": 2, "july to september": 3, "october to december": 4}
+
+
+def quarter_code(label):
+    """'July to September, 2026' -> '2026Q3'. None when the label is not a quarter."""
+    m = re.match(r"\s*([A-Za-z ]+?),\s*(\d{4})", str(label or ""))
+    if not m:
+        return None
+    q = _QF.get(m.group(1).strip().lower())
+    return f"{m.group(2)}Q{q}" if q else None
+
+
+def load_qpr(pid):
+    """Filed QPR rows for a project (pipeline/fetch_qpr.py), newest first."""
+    p = os.path.join(QPR_RAW, f"{pid}.json.gz")
+    if not os.path.exists(p):
+        return []
+    try:
+        with gzip.open(p, "rt", encoding="utf-8") as fh:
+            rows = (json.load(fh) or {}).get("rows") or []
+    except Exception:  # noqa: BLE001
+        return []
+    for r in rows:
+        r["code"] = quarter_code(r.get("quarter"))
+    rows.sort(key=lambda r: (r.get("code") or ""), reverse=True)
+    return rows
+
+
 def load_complaints():
     p = os.path.join(AUX, "complaints.json")
     return json.load(open(p)).get("Data") or [] if os.path.exists(p) else []
@@ -308,6 +337,9 @@ def build_record(raw):
     # SaleableArea (only 40 of 2,419 file both). Treating the two API columns as
     # independent measures made a 100%-covered register look 11% covered, and made
     # area charts go blank on filters where the other column was the one filed.
+    qpr = load_qpr(raw["projectId"])
+    apr_rows = d.get("apr") or []
+
     saleable = num(b.get("SaleableArea"))
     built_up = num(b.get("BuiltUpAreaFSI"))
     declared_area = built_up or saleable
@@ -353,8 +385,22 @@ def build_record(raw):
         "carpetAvg": round(statistics.fmean(carpets), 1) if carpets else None,
         "plotMin": round(min(a for a, _ in plot_areas), 1) if plot_areas else None,
         "plotMax": round(max(a for a, _ in plot_areas), 1) if plot_areas else None,
-        "sold": sold,
-        "unsold": unsold,
+        # Form-B unit-row status (kept for transparency; the row counts inflate badly)
+        "soldUnitRows": sold,
+        "unsoldUnitRows": unsold,
+        # QPR is the authority's own per-quarter inventory figure - use it for "sold"
+        "sold": (qpr[0].get("booked") if qpr else None),
+        "unsold": (qpr[0].get("unbooked") if qpr else None),
+        "sanctioned": (qpr[0].get("sanctioned") if qpr else None),
+        "pctSold": (qpr[0].get("pctBooked") if qpr else None),
+        "constPct": (qpr[0].get("constPct") if qpr else None),
+        "qprQuarter": (qpr[0].get("quarter") if qpr else None),
+        "qprQ": (qpr[0].get("code") if qpr else None),
+        "qprFiled": (qpr[0].get("filedOn") if qpr else None),
+        "qprFilings": len(d.get("qpr") or []),
+        "qprEnriched": len(qpr),
+        "aprYear": (apr_rows[0].get("CurrentFinYear") if apr_rows else None),
+        "aprFilings": len(apr_rows),
         "isPlotted": bool(is_plotted),
         "landCost": round(land_cost) or None,
         "totalCost": round(total_cost) or None,
@@ -408,6 +454,7 @@ def build_record(raw):
         "specialMods": len(d.get("specialMods") or []),
         "mapRevisions": len(d.get("mapRevisions") or []),
         "qpr": len(d.get("qpr") or []),
+        "qprHistory": qpr,
         "apr": len(d.get("apr") or []),
         "hasComplaintOrder": bool(d.get("hasComplaintOrder")),
         "paymentStatus": (raw.get("paymentSummary") or {}).get("PaymentStatus"),
@@ -628,6 +675,8 @@ def main():
         "plots": sum(r["plotCount"] or 0 for r in records),
         "cost": round(sum(r["totalCost"] or 0 for r in records)),
         "buildings": sum(r["buildings"] or 0 for r in records),
+        "sold": sum(r["sold"] or 0 for r in records),
+        "unsold": sum(r["unsold"] or 0 for r in records),
         "cases": len(matched),
         "agents": len(agents),
     }
@@ -648,7 +697,10 @@ def main():
         "years": dict(sorted(Counter(r["regYear"] for r in records if r["regYear"]).items())),
         "coverage": {f: coverage(records, f) for f in
                      ("area", "saleable", "builtUp", "landArea", "units", "plotCount", "totalCost",
-                      "regDate", "carpetAvg", "plotMin")},
+                      "regDate", "carpetAvg", "plotMin", "qprQ", "sold")},
+        # filing recency: how many projects last filed each quarter, newest first
+        "qprQuarters": dict(Counter(r["qprQ"] for r in records if r["qprQ"]).most_common()),
+        "aprYears": dict(Counter(r.get("aprYear") for r in records if r.get("aprYear")).most_common()),
         "unitBuckets": dict(Counter(b for r in records for b in (r["unitMix"] or {}))),
         "complaints": {
             "linkage": "builder-level",

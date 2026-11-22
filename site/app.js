@@ -208,6 +208,7 @@ function render() {
   renderKpis(rows);
   if (state.tab === 'overview') renderOverview(rows);
   if (state.tab === 'projects') renderProjects(rows);
+  if (state.tab === 'qpr') renderQpr(rows);
   if (state.tab === 'promoters') renderPromoters(rows);
   if (state.tab === 'pivot') renderPivot(rows);
   if (state.tab === 'cases') renderCases(rows);
@@ -525,12 +526,76 @@ function renderOverview(rows) {
     Object.entries(teh).sort((a, b) => b[1] - a[1]).slice(0, 15).map(x => x[1]), pal[0], 260);
 }
 
+/* ---------------------------------------------------------------- qpr / apr */
+const Q_END = { 1: 3, 2: 6, 3: 9, 4: 12 };
+
+function quartersSince(code) {
+  const m = /^(\d{4})Q([1-4])$/.exec(code || '');
+  if (!m) return null;
+  const endQ = (+m[1]) * 4 + (+m[2] - 1);          // quarter index of the quarter reported
+  const asof = new Date(META.asOf || Date.now());
+  const nowQ = asof.getUTCFullYear() * 4 + Math.floor(asof.getUTCMonth() / 3);
+  return Math.max(0, nowQ - endQ);
+}
+
+function staleness(n) {
+  if (n == null) return '<span class="pill bad">never filed</span>';
+  if (n <= 1) return '<span class="pill pl">current</span>';
+  return `<span class="pill bad">${n} quarters behind</span>`;
+}
+
+function renderQpr(rows) {
+  const filed = rows.filter(r => r.qprQ);
+  const never = rows.length - filed.length;
+  const overdue = filed.filter(r => (quartersSince(r.qprQ) || 0) >= 2).length;
+  $('#qprCount').innerHTML = `${n0(rows.length)} projects · <b>${n0(filed.length)}</b> have filed a QPR ` +
+    `(${n0(overdue)} of those are two or more quarters behind) · <b>${n0(never)}</b> never filed · ` +
+    `showing ${n0(Math.min(rows.length, 400))}`;
+
+  const sort = ($('#qprSort') && $('#qprSort').value) || 'recent';
+  const list = rows.slice().sort((a, b) => {
+    if (sort === 'recent') return String(b.qprFiled || '').localeCompare(String(a.qprFiled || ''));
+    if (sort === 'sold') return (b.sold || -1) - (a.sold || -1);
+    if (sort === 'pct') return (b.pctSold || -1) - (a.pctSold || -1);
+    const sa = a.qprQ ? (quartersSince(a.qprQ) || 0) : 999;   // never filed sorts first
+    const sb = b.qprQ ? (quartersSince(b.qprQ) || 0) : 999;
+    return sb - sa || String(a.name || '').localeCompare(String(b.name || ''));
+  });
+
+  const body = list.slice(0, 400).map(p => {
+    const n = quartersSince(p.qprQ);
+    return `<tr class="click" data-id="${p.id}">
+      <td class="wrap" style="max-width:250px;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</td>
+      <td class="wrap" style="max-width:190px;overflow:hidden;text-overflow:ellipsis" title="${esc(p.promoter)}">${esc(p.promoter)}</td>
+      <td>${esc(p.tehsil)}</td>
+      <td>${p.qprQ ? esc((p.qprQuarter || '').replace(',', ' ·')) : '<span class="dim">–</span>'}</td>
+      <td class="mono">${p.qprFiled || '<span class="dim">–</span>'}</td>
+      <td>${staleness(n)}</td>
+      <td class="r">${p.sold == null ? '<span class="dim">–</span>' : n0(p.sold)}</td>
+      <td class="r">${p.unsold == null ? '<span class="dim">–</span>' : n0(p.unsold)}</td>
+      <td class="r">${p.pctSold == null ? '<span class="dim">–</span>' : p.pctSold + '%'}</td>
+      <td class="r">${p.constPct == null ? '<span class="dim">–</span>' : p.constPct + '%'}</td>
+      <td class="mono">${p.aprYear || '<span class="dim">–</span>'}</td>
+    </tr>`;
+  }).join('');
+
+  $('#tblQpr').innerHTML = `<table>
+    <thead><tr>
+      <th>Project</th><th>Promoter</th><th>Tehsil</th>
+      <th>Last QPR</th><th>Filed</th><th>QPR status</th>
+      <th class="r">Booked</th><th class="r">Unsold</th><th class="r">% booked</th>
+      <th class="r">Construction</th><th>Last APR</th>
+    </tr></thead><tbody>${body || '<tr><td colspan="11" class="dim">No projects match these filters.</td></tr>'}</tbody></table>`;
+  $$('#tblQpr tbody tr').forEach(tr => tr.onclick = () => openDetail(tr.dataset.id));
+}
+
 /* ----------------------------------------------------------------- projects */
 const COLS = [
   ['name', 'Project', 'text'], ['cat', 'Category', 'text'], ['promoter', 'Promoter', 'text'],
   ['status', 'Status', 'text'], ['regDate', 'Registered', 'date'], ['tehsil', 'Tehsil', 'text'],
   ['landArea', 'Land', 'area'], ['area', 'Area', 'area'],
-  ['units', 'Units', 'num'], ['plotCount', 'Plots', 'num'], ['buildings', 'Bldgs', 'num'],
+  ['units', 'Units', 'num'], ['plotCount', 'Plots', 'num'],
+  ['sold', 'Sold', 'num'], ['unsold', 'Unsold', 'num'], ['buildings', 'Bldgs', 'num'],
   ['totalCost', 'Cost', 'money'], ['casesPromoter', 'Builder cases', 'num'],
 ];
 
@@ -563,6 +628,8 @@ function renderProjects(rows) {
     <td class="r" title="${p.areaSrc ? 'as filed: ' + p.areaSrc : 'not filed'}">${area(p.area)}</td>
     <td class="r">${n0(p.units)}</td>
     <td class="r">${n0(p.plotCount)}</td>
+    <td class="r" title="${p.qprQ ? 'QPR ' + esc(p.qprQuarter || p.qprQ) : 'no QPR filed'}">${p.sold == null ? '<span class="dim">–</span>' : n0(p.sold)}</td>
+    <td class="r">${p.unsold == null ? '<span class="dim">–</span>' : n0(p.unsold)}</td>
     <td class="r">${n0(p.buildings)}</td>
     <td class="r">${money(p.totalCost)}</td>
     <td class="r">${p.casesProject + p.casesPromoter ? n0(p.casesProject + p.casesPromoter) : '<span class="dim">0</span>'}</td>
@@ -887,6 +954,28 @@ async function openDetail(id) {
       <div><span>Sold / unsold</span><span>${
         (p.sold || p.unsold) ? `${n0(p.sold)} / ${n0(p.unsold)}` : 'Not filed'}</span></div></div>` : ''}
 
+    <h4>QPR / APR filings</h4>
+    ${(() => {
+      const hist = (det && det.qprHistory) || [];
+      if (!hist.length) {
+        return `<p class="mini dim" style="margin:0 0 4px">No quarterly progress report filed for this
+          project.${p.aprYear ? ` Last annual report: FY ${esc(p.aprYear)}.` : ''}</p>`;
+      }
+      const rows = hist.slice(0, 8).map(x => `<tr>
+        <td>${esc(x.quarter || '–')}</td>
+        <td class="mono">${x.filedOn || '–'}</td>
+        <td class="r">${x.booked == null ? '–' : n0(x.booked)}</td>
+        <td class="r">${x.unbooked == null ? '–' : n0(x.unbooked)}</td>
+        <td class="r">${x.pctBooked == null ? '–' : x.pctBooked + '%'}</td>
+        <td class="r">${x.constPct == null ? '–' : x.constPct + '%'}</td></tr>`).join('');
+      return `<p class="mini dim" style="margin:0 0 6px">${n0(hist.length)} quarterly filing${hist.length === 1 ? '' : 's'}
+        · latest ${esc(p.qprQuarter || '')}${p.qprFiled ? ' filed ' + p.qprFiled : ''}
+        ${p.aprYear ? '· last annual report FY ' + esc(p.aprYear) : '· no annual report'}
+        ${p.sanctioned != null ? '· ' + n0(p.sanctioned) + ' sanctioned' : ''}</p>
+      <table class="mini"><thead><tr><th>Quarter reported</th><th>Filed</th>
+        <th class="r">Booked</th><th class="r">Unsold</th><th class="r">% booked</th><th class="r">Construction</th></tr></thead>
+        <tbody>${rows}</tbody></table>`;
+    })()}
     <h4>Cost estimate (Form-B)</h4>
     <div class="tbl-wrap">
       <table class="mini"><thead><tr><th>Head</th><th class="r">Estimated</th><th class="r">Actual</th></tr></thead>
@@ -982,6 +1071,8 @@ function wire() {
     state.cats.has(k) ? state.cats.delete(k) : state.cats.add(k);
     c.classList.toggle('on'); c.setAttribute('aria-pressed', String(c.classList.contains('on'))); render();
   };
+  if ($('#qprSort')) $('#qprSort').onchange = () => render();
+
   $('#fStatus').onclick = (e) => {
     const c = e.target.closest('[data-status]'); if (!c) return;
     const k = c.dataset.status;

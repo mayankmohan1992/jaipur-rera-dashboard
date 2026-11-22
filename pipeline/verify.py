@@ -18,7 +18,8 @@ DATA = os.path.join(ROOT, "site", "data")
 
 MIN_PROJECTS = 2000      # Jaipur district holds ~2,419 registered projects
 MIN_PROMOTERS = 500
-MIN_FIELDS = ("projects", "promoters", "units", "plots", "area", "saleable", "builtUp", "cases")
+MIN_FIELDS = ("projects", "promoters", "units", "plots", "area", "saleable", "builtUp",
+              "sold", "unsold", "cases")
 
 
 def die(msg):
@@ -44,7 +45,8 @@ def main():
 
     print(f"asOf={meta.get('asOf')}  projects={t['projects']}  promoters={t['promoters']}  "
           f"units={t['units']}  plots={t['plots']}  area={t['area']}  "
-          f"(built-up {t['builtUp']} + saleable {t['saleable']})  cases={t['cases']}")
+          f"(built-up {t['builtUp']} + saleable {t['saleable']})  sold={t['sold']}  "
+          f"unsold={t['unsold']}  cases={t['cases']}")
 
     if len(proj) != t["projects"]:
         die(f"projects.json has {len(proj)} rows but meta says {t['projects']}")
