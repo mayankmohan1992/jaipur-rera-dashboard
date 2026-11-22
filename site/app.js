@@ -102,7 +102,7 @@ function toast(msg) {
 }
 
 /* -------------------------------------------------------------------- load */
-async function stalenessNotice() {
+function stalenessNotice() {
   const asOf = META && META.asOf ? new Date(META.asOf) : null;
   if (!asOf || isNaN(asOf)) return '';
   const days = Math.floor((Date.now() - asOf.getTime()) / 86400000);
@@ -604,10 +604,6 @@ function renderQpr(rows) {
       `quarters since the quarter reported · ${n0(buckets.current)} current, ` +
       `${n0(buckets['2-3'] + buckets['4-7'] + buckets['8+'])} two or more behind, ${n0(buckets.never)} never filed`;
   }
-  $('#qprCount').innerHTML = `${n0(rows.length)} projects · <b>${n0(filed.length)}</b> have filed a QPR ` +
-    `(${n0(overdue)} of those are two or more quarters behind) · <b>${n0(never)}</b> never filed · ` +
-    `showing ${n0(Math.min(scoped.length, 400))} of ${n0(scoped.length)} in this scope`;
-
   const scope = ($('#qprScope') && $('#qprScope').value) || 'all';
   const scoped = rows.filter(r => {
     const n = quartersSince(r.qprQ);
@@ -616,6 +612,10 @@ function renderQpr(rows) {
     if (scope === 'overdue') return r.qprQ && (n || 0) >= 2;
     return true;
   });
+  $('#qprCount').innerHTML = `${n0(rows.length)} projects · <b>${n0(filed.length)}</b> have filed a QPR ` +
+    `(${n0(overdue)} of those are two or more quarters behind) · <b>${n0(never)}</b> never filed · ` +
+    `showing ${n0(Math.min(scoped.length, 400))} of ${n0(scoped.length)} in this scope`;
+
   const sort = ($('#qprSort') && $('#qprSort').value) || 'recent';
   const list = scoped.slice().sort((a, b) => {
     if (sort === 'recent') return String(b.qprFiled || '').localeCompare(String(a.qprFiled || ''));
