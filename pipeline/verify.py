@@ -54,6 +54,14 @@ def main():
         die(f"only {t['projects']} projects (expected >={MIN_PROJECTS})")
     if t["promoters"] < MIN_PROMOTERS:
         die(f"only {t['promoters']} promoters (expected >={MIN_PROMOTERS})")
+    # guard the QPR cache: a half-filled raw_qpr/ silently drops every Sold/Unsold figure
+    # and the whole QPR tab, so refuse to publish a dataset that lost it
+    if t.get("sold", 0) < 10000:
+        die(f"only {t.get('sold')} booked units in the payload — the QPR cache is incomplete")
+    qcov = (meta.get("coverage") or {}).get("qprQ") or {}
+    if qcov.get("n", 0) < 1500:
+        die(f"only {qcov.get('n')} projects carry a QPR — the QPR cache is incomplete")
+
     if not any(p.get("regDate") for p in proj):
         die("no registration dates parsed")
 

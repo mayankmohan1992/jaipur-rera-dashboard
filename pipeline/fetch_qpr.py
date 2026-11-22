@@ -85,6 +85,19 @@ def dmy(v):
     return f"{m.group(3)}-{m.group(2).zfill(2)}-{m.group(1).zfill(2)}" if m else None
 
 
+Q_FROM = {"january to march": 1, "april to june": 2, "july to september": 3, "october to december": 4}
+
+
+def quarter_code(label):
+    # 'July to September, 2026' -> '2026Q3' — compares a cache entry with the newest
+    # quarter the dossier lists, so a fresh filing is never mistaken for a cache hit
+    m = re.match(r"\s*([A-Za-z ]+?),\s*(\d{4})", str(label or ""))
+    if not m:
+        return None
+    q = Q_FROM.get(m.group(1).strip().lower())
+    return f"{m.group(2)}Q{q}" if q else None
+
+
 def quarter_of(row):
     """The qpr row's quarter label, e.g. 'July to September, 2026'."""
     return (row.get("CurrentQuarter") or "").strip()
@@ -128,12 +141,17 @@ def work(args):
         # skip only when the cache already holds everything this run would fetch -
         # otherwise a --all pass would silently reuse a latest-only file
         want = len(rows) if all_quarters else 1
+        # newest quarter the dossier knows about: a project that files again keeps the
+        # same row count, so comparing lengths alone would skip a fresh filing
+        newest = quarter_code(quarter_of(max(rows, key=lambda r: num(r.get("QuaterID")) or 0))) if rows else None
         if os.path.exists(out_path) and rows:
             try:
-                have = len(json.load(gzip.open(out_path, "rt")).get("rows") or [])
+                cached = json.load(gzip.open(out_path, "rt")).get("rows") or []
+                have = len(cached)
+                cached_newest = quarter_code((cached[0] or {}).get("quarter")) if cached else None
             except Exception:                                   # noqa: BLE001
-                have = 0
-            if have >= want:
+                have, cached_newest = 0, None
+            if have >= want and cached_newest == newest:
                 with _lock:
                     globals()["_done"] += 1
                     if _done % 200 == 0:

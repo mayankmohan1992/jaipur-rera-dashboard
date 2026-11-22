@@ -51,6 +51,14 @@ if [ "$CRAWL" = "1" ]; then
   python3 pipeline/fetch_aux.py
 fi
 
+if [ "$CRAWL" = "1" ]; then
+  # incremental: skips any project whose cache already holds the newest filed quarter,
+  # so a daily run costs a handful of calls rather than the full 16k
+  say "enrich quarterly filings (QPR)"
+  python3 pipeline/fetch_qpr.py --workers 3 || \
+    echo "QPR enrichment unavailable this run — building from the cache as it stands" >&2
+fi
+
 say "build payloads"
 python3 pipeline/build.py
 
