@@ -85,6 +85,10 @@ jobs:
         if: steps.probe.outputs.reachable == 'true'
         run: python3 pipeline/fetch_aux.py
 
+      - name: Enrich quarterly filings (QPR)
+        if: steps.probe.outputs.reachable == 'true'
+        run: python3 pipeline/fetch_qpr.py --workers "$WORKERS"
+
       - name: Build payloads
         if: steps.probe.outputs.reachable == 'true'
         run: python3 pipeline/build.py
