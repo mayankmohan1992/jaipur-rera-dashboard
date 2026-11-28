@@ -15,8 +15,14 @@ name: refresh (self-hosted)
 # an interrupted run costs only the projects it had not reached.
 
 on:
-  schedule:
-    - cron: '30 0 * * *'        # 06:00 IST
+  # NO `schedule:` here on purpose. The job needs a runner labelled `rera`, and while none is
+  # registered GitHub holds every cron trigger as a permanently `queued` run: it never starts,
+  # it is replaced by the next day's pending run, and it clutters `gh run list` with something
+  # that looks like a hang. Trigger it by hand (`gh workflow run refresh-selfhosted.yml`) or
+  # re-add the line below the day the runner is online — docs/RUNNER.md has the setup and the
+  # exact one-line change:
+  #   schedule:
+  #     - cron: '30 0 * * *'        # 06:00 IST
   workflow_dispatch:
     inputs:
       reason:
@@ -24,7 +30,9 @@ on:
         required: false
 
 concurrency:
-  group: refresh
+  # Its own group: see the note in refresh.yml. Sharing `refresh` with the GitHub-hosted
+  # workflow meant this job's pending queue slot kept deleting that workflow's daily run.
+  group: refresh-selfhosted
   cancel-in-progress: false
 
 permissions:

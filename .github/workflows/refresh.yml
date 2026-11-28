@@ -38,7 +38,15 @@ on:
       - '.github/workflows/refresh.yml'
 
 concurrency:
-  group: refresh
+  # MUST NOT be the same group as refresh-selfhosted.yml. Both workflows used to sit in
+  # `group: refresh`, and GitHub keeps only ONE pending run per group: the self-hosted job
+  # (which can never start until a runner with the `rera` label is registered) arrived two
+  # minutes after this one every morning and displaced it, so from 25 Nov every scheduled
+  # run of THIS workflow came back `cancelled` and the site quietly served old data for days
+  # while nothing looked broken — a wall of `cancelled`, not `failure`. Only one of the two
+  # can update gh-pages at a time in any case, and they already publish the same tree, so the
+  # duplicate-work cost is nil while the cancelled-fallback cost was the whole refresh.
+  group: refresh-hosted
   cancel-in-progress: false
 
 permissions:

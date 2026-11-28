@@ -195,8 +195,16 @@ at 06:30 still refreshes. Manual run:
 **GitHub Actions** (`.github/workflows/refresh.yml`) still runs on schedule and on push, but
 first calls `preflight.py`. When the runner cannot reach the portal it skips the crawl and
 exits **green** with a summary explaining why — a red X for someone else's firewall teaches
-nothing and hides real failures. If a self-hosted runner with Indian egress is ever added,
-change `runs-on: [self-hosted, linux]` and the same workflow does the full job.
+nothing and hides real failures. `.github/workflows/refresh-selfhosted.yml` is the variant that
+does the full crawl, on a runner you own with the `rera` label; it is dispatch-only until such
+a runner exists, because a scheduled job no runner can claim sits `queued` for ever (see
+`docs/RUNNER.md`). The two workflows hold separate `concurrency` groups — sharing one meant the
+unclaimable job's queue slot cancelled this workflow's daily run every morning.
+
+**Heads-up on freshness:** while the portal stays unreachable from GitHub's Azure egress, the
+scheduled workflow can only *report*, not refresh. The data on the site is as old as the last
+run of `scripts/refresh.sh` or of the self-hosted job; the page says so in a red notice once
+`meta.json` is more than three days old.
 
 ---
 

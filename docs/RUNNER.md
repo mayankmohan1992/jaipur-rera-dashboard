@@ -40,13 +40,22 @@ sudo ./svc.sh install && sudo ./svc.sh start     # survives reboots and logouts
 ```
 
 Get `<TOKEN>` from **Settings → Actions → Runners → New self-hosted runner**. The label
-`rera` is what `.github/workflows/refresh-selfhosted.yml` targets; once the runner is
-online, that workflow takes over the 06:00 IST refresh and `jaipur-rera-refresh.timer`
-becomes redundant:
+`rera` is what `.github/workflows/refresh-selfhosted.yml` targets. That workflow is
+**dispatch-only** while no runner exists — a scheduled job with no runner to claim it sits
+`queued` for ever and looks like a hang, so the cron is kept commented out in the file. Once
+the runner shows **Idle**, do two things:
 
 ```bash
+# 1. uncomment the two lines under `on:` in .github/workflows/refresh-selfhosted.yml
+#      schedule:
+#        - cron: '30 0 * * *'        # 06:00 IST
+# 2. drop the timer on this machine — the Action owns the daily refresh from now on
 systemctl --user disable --now jaipur-rera-refresh.timer
 ```
+
+Until then the GitHub-hosted workflow (`refresh.yml`) still runs daily: it probes the portal,
+and because Azure egress is blocked it exits green with the reason in the run summary. That is
+a reachability report, not a refresh — no data is published from it.
 
 Keep the working directory warm — `raw/` and `raw_qpr/` live in the runner's workspace
 and make each run incremental instead of a full crawl.
