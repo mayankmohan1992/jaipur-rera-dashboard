@@ -1,0 +1,252 @@
+{
+ "asOf": "2026-11-28T19:26:03",
+ "district": "Jaipur",
+ "districtId": 1077,
+ "source": "rera.rajasthan.gov.in (RERA Rajasthan 2.0)",
+ "totals": {
+  "projects": 2428,
+  "promoters": 1380,
+  "saleable": 5883205,
+  "builtUp": 37150556,
+  "area": 41731274,
+  "land": 45354383,
+  "units": 129988,
+  "plots": 137483,
+  "cost": 970237531998,
+  "buildings": 1873,
+  "sold": 107046,
+  "unsold": 123844,
+  "cases": 3413,
+  "agents": 10404
+ },
+ "category": {
+  "Plotted Development": 1063,
+  "Group Housing": 1259,
+  "Mixed (Residential And Commercial)": 43,
+  "Commercial": 63
+ },
+ "status": {
+  "COMPLETED": 1028,
+  "COMPLETED & OC ISSUED ": 149,
+  "LAPSED": 404,
+  "INPROGRESS": 760,
+  "SUSPENDED": 11,
+  "REVOKED": 55,
+  "EXEMPTED": 21
+ },
+ "appStatus": {
+  "Application Approved": 2362,
+  "APPLICATION SUSPENDED": 11,
+  "APPLICATION REVOKE": 55
+ },
+ "promoterTypes": {
+  "-": 2428
+ },
+ "tehsils": {
+  "Sanganer": 1143,
+  "Jaipur": 858,
+  "Chaksu": 98,
+  "Madhorajpura": 57,
+  "Amer": 56,
+  "Mauzamabad": 34,
+  "Bassi": 28,
+  "Kotputli": 27,
+  "Kalwar": 25,
+  "Phulera (Hq. Sambhar)": 23,
+  "Phagi": 20,
+  "Rampuradabri": 16,
+  "Jamwa Ramgarh": 9,
+  "Shahpura": 8,
+  "Kalwad": 6,
+  "Chomu": 6,
+  "Kishangarh Renwal": 4,
+  "Dudu": 2,
+  "Jalsu": 2,
+  "Jhotwara": 1,
+  "Mahal": 1,
+  "Paota": 1,
+  "Rajasv Gram Hirapura": 1,
+  "Jobner": 1,
+  "-": 1
+ },
+ "places": {
+  "tehsil": {
+   "before": 40,
+   "after": 25,
+   "merged": 15,
+   "alias_rows": 14
+  },
+  "village": {
+   "before": 1083,
+   "after": 838,
+   "merged": 245,
+   "alias_rows": 0
+  }
+ },
+ "years": {
+  "2017": 280,
+  "2018": 108,
+  "2019": 107,
+  "2020": 112,
+  "2021": 187,
+  "2022": 306,
+  "2023": 308,
+  "2024": 274,
+  "2025": 456,
+  "2026": 290
+ },
+ "coverage": {
+  "area": {
+   "n": 2427,
+   "pct": 99.96
+  },
+  "saleable": {
+   "n": 270,
+   "pct": 11.12
+  },
+  "builtUp": {
+   "n": 2197,
+   "pct": 90.49
+  },
+  "landArea": {
+   "n": 2428,
+   "pct": 100.0
+  },
+  "units": {
+   "n": 984,
+   "pct": 40.53
+  },
+  "plotCount": {
+   "n": 1084,
+   "pct": 44.65
+  },
+  "totalCost": {
+   "n": 2422,
+   "pct": 99.75
+  },
+  "regDate": {
+   "n": 2428,
+   "pct": 100.0
+  },
+  "carpetAvg": {
+   "n": 977,
+   "pct": 40.24
+  },
+  "plotMin": {
+   "n": 1061,
+   "pct": 43.7
+  },
+  "qprQ": {
+   "n": 2157,
+   "pct": 88.84
+  },
+  "sold": {
+   "n": 1259,
+   "pct": 51.85
+  }
+ },
+ "qprQuarters": {
+  "2026Q3": 551,
+  "2025Q4": 102,
+  "2026Q2": 99,
+  "2024Q4": 95,
+  "2025Q3": 90,
+  "2024Q2": 82,
+  "2026Q1": 81,
+  "2022Q1": 75,
+  "2025Q2": 75,
+  "2025Q1": 68,
+  "2022Q4": 68,
+  "2023Q1": 65,
+  "2023Q4": 64,
+  "2023Q2": 62,
+  "2024Q1": 60,
+  "2024Q3": 58,
+  "2021Q4": 53,
+  "2022Q2": 52,
+  "2023Q3": 51,
+  "2022Q3": 43,
+  "2021Q3": 33,
+  "2021Q1": 23,
+  "2021Q2": 22,
+  "2018Q4": 20,
+  "2020Q1": 19,
+  "2019Q2": 18,
+  "2019Q3": 16,
+  "2018Q3": 15,
+  "2019Q4": 15,
+  "2020Q4": 14,
+  "2020Q3": 12,
+  "2019Q1": 12,
+  "2026Q4": 11,
+  "2018Q1": 10,
+  "2017Q4": 8,
+  "2020Q2": 8,
+  "2018Q2": 6,
+  "2017Q3": 1
+ },
+ "aprYears": {
+  "2022-23": 257,
+  "2023-24": 229,
+  "2024-25": 219,
+  "2021-22": 165,
+  "2017-18": 161,
+  "2020-21": 119,
+  "2019-20": 93,
+  "2018-19": 54,
+  "2025-26": 10
+ },
+ "unitBuckets": {
+  "3BHK": 548,
+  "4BHK": 273,
+  "5BHK+": 34,
+  "2BHK": 298,
+  "Other": 346,
+  "Studio/1RK": 44,
+  "Shop/Showroom": 187,
+  "Plot": 28,
+  "1BHK": 95,
+  "Villa/RowHouse": 40,
+  "Office": 41
+ },
+ "complaints": {
+  "linkage": "builder-level",
+  "note": "The public complaint register names a respondent (promoter/builder) and has a ProjectName column that is empty on every row, so cases are linked to a builder, not to a project. Per-project figures are that builder's cases.",
+  "withProjectName": 0,
+  "statewide": 7936,
+  "matched": 3413,
+  "unmatched": 4523,
+  "byType": {
+   "2": 785,
+   "1": 2627,
+   "3": 1
+  },
+  "byStatus": {
+   "115": 658,
+   "88": 486,
+   "89": 439,
+   "83": 375,
+   "81": 278,
+   "77": 236,
+   "80": 196,
+   "111": 137,
+   "78": 132,
+   "98": 123,
+   "114": 112,
+   "79": 55,
+   "90": 50,
+   "94": 43,
+   "121": 36,
+   "99": 22,
+   "110": 16,
+   "76": 4,
+   "97": 4,
+   "84": 4,
+   "0": 3,
+   "95": 2,
+   "85": 1,
+   "96": 1
+  }
+ },
+ "areaUnit": "sq m (portal native); sq ft = sq m × 10.7639"
+}
